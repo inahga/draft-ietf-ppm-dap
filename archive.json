@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-04-21T00:59:19.815678+00:00",
+  "timestamp": "2024-04-23T00:55:55.602519+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -10573,6 +10573,24 @@
       "createdAt": "2024-02-28T16:11:04Z",
       "updatedAt": "2024-02-29T21:44:54Z",
       "closedAt": "2024-02-29T21:44:40Z",
+      "comments": []
+    },
+    {
+      "number": 553,
+      "id": "I_kwDOFEJYQs6GjZWF",
+      "title": "Add a ladder diagram illustrating what bits need to be stored",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/553",
+      "state": "OPEN",
+      "author": "cjpatton",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [
+        "editorial"
+      ],
+      "body": "It should also show what bits need to be \"eventually consistent\" versus transactional.",
+      "createdAt": "2024-04-22T20:40:20Z",
+      "updatedAt": "2024-04-22T20:40:49Z",
+      "closedAt": null,
       "comments": []
     }
   ],
