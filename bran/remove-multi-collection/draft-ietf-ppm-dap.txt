@@ -1606,15 +1606,16 @@ struct {} Empty;
    } PrepareRespState;
 
    enum {
-     report_replayed(0),
-     report_dropped(1),
-     hpke_unknown_config_id(2),
-     hpke_decrypt_error(3),
-     vdaf_prep_error(4),
-     batch_saturated(5),
-     task_expired(6),
-     invalid_message(7),
-     report_too_early(8),
+     batch_collected(0),
+     report_replayed(1),
+     report_dropped(2),
+     hpke_unknown_config_id(3),
+     hpke_decrypt_error(4),
+     vdaf_prep_error(5),
+     batch_saturated(6),
+     task_expired(7),
+     invalid_message(8),
+     report_too_early(9),
      (255)
    } PrepareError;
 
@@ -1779,7 +1780,25 @@ struct {} Empty;
        input share MUST be marked as invalid with the error
        report_replayed.
 
-   7.  Depending on the query type for the task, additional checks may
+   7.  If the report pertains to a batch that was previously collected,
+       then the input share MUST be marked as invalid with error
+       batch_collected.
+
+       *  Implementation note: The Leader considers a batch to be
+          collected once it has completed a collection job for a
+          CollectionReq message from the Collector; the Helper considers
+          a batch to be collected once it has responded to an
+          AggregateShareReq message from the Leader.  A batch is
+          determined by query (Section 4.1) conveyed in these messages.
+          Queries must satisfy the criteria covered in Section 4.6.5.
+          These criteria are meant to restrict queries in a way make it
+          easy to determine wither a report pertains to a batch that was
+          collected.
+
+          [TODO: If a section to clarify report and batch states is
+          added this can be removed.  See Issue #384]
+
+   8.  Depending on the query type for the task, additional checks may
        be applicable:
 
        *  For fixed_size tasks, the Aggregators need to ensure that each
@@ -1794,7 +1813,7 @@ struct {} Empty;
           the task configuration).  If both checks succeed, the input
           share is not marked as invalid.
 
-   8.  Finally, if an Aggregator cannot determine if an input share is
+   9.  Finally, if an Aggregator cannot determine if an input share is
        valid, it MUST mark the input share as invalid with error
        report_dropped.  For example, if the Aggregator has evicted the
        state required to perform the check from long-term storage.  (See
