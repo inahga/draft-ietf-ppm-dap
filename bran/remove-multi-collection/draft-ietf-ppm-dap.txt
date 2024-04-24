@@ -5,14 +5,14 @@
 Network Working Group                                       T. Geoghegan
 Internet-Draft                                                      ISRG
 Intended status: Standards Track                               C. Patton
-Expires: 25 October 2024                                      Cloudflare
+Expires: 26 October 2024                                      Cloudflare
                                                                B. Pitman
                                                                     ISRG
                                                              E. Rescorla
                                                                  Mozilla
                                                               C. A. Wood
                                                               Cloudflare
-                                                           23 April 2024
+                                                           24 April 2024
 
 
   Distributed Aggregation Protocol for Privacy Preserving Measurement
@@ -63,7 +63,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 25 October 2024.
+   This Internet-Draft will expire on 26 October 2024.
 
 Copyright Notice
 
@@ -451,10 +451,8 @@ Table of Contents
 
    This protocol is extensible and allows for the addition of new
    cryptographic schemes that implement the VDAF interface specified in
-   [VDAF].  Candidates include:
-
-   *  Prio3 (Section 7 of [VDAF]), which allows for aggregate statistics
-      such as sum, mean, histograms, etc.
+   [VDAF].  This protocol only supports VDAFs which require a single
+   collection to provide useful results.
 
    VDAFs rely on secret sharing to protect the privacy of the
    measurements.  Rather than sending its input in the clear, each
@@ -834,8 +832,6 @@ struct {} Empty;
    A query includes parameters used by the Aggregators to select a batch
    of reports specific to the given query type.  A query is defined as
    follows:
-
-   opaque BatchID[32];
 
    struct {
      QueryType query_type;
@@ -1289,15 +1285,18 @@ struct {} Empty;
 
    1.  To "refine" the input shares into "output shares" that have the
        desired aggregatable form.  For some VDAFs, like Prio3, the
-       mapping from input to output shares is some fixed, linear
-       operation, but in general the mapping is controlled dynamically
-       by the Collector and can be non-linear.
+       mapping from input to output shares is a fixed operation
+       depending only on the input share, but in general the mapping
+       involves an aggregation parameter chosen by the Collector.
 
    2.  To verify that the output shares, when combined, correspond to a
        valid, refined measurement, where validity is determined by the
        VDAF itself.  For example, the Prio3Sum variant of Prio3
        (Section 7.4.2 of [VDAF]) requires that the output shares sum up
-       to an integer in a specific range.
+       to an integer in a specific range, while the Prio3Histogram
+       variant (Section 7.4.4 of [VDAF]) proves that output shares sum
+       up to a one-hot vector representing a contribution to a single
+       bucket of the histogram.
 
    In general, refinement and verification are not distinct
    computations, since for some VDAFs, verification may only be achieved
@@ -1470,6 +1469,8 @@ struct {} Empty;
    Once all the report shares have been initialized, the Leader creates
    an AggregationJobInitReq message structured as follows:
 
+   opaque BatchID[32];
+
    struct {
      QueryType query_type;
      select (PartialBatchSelector.query_type) {
@@ -1483,11 +1484,6 @@ struct {} Empty;
      PartialBatchSelector part_batch_selector;
      PrepareInit prepare_inits<1..2^32-1>;
    } AggregationJobInitReq;
-
-   [[OPEN ISSUE: Consider sending report shares separately (in parallel)
-   to the aggregate instructions.  Right now, aggregation parameters and
-   the corresponding report shares are sent at the same time, but this
-   may not be strictly necessary.]]
 
    This message consists of:
 
@@ -1779,6 +1775,15 @@ struct {} Empty;
    6.  Check if the report has been previously aggregated.  If so, the
        input share MUST be marked as invalid with the error
        report_replayed.
+
+       *  Implementation note: To detect replay attacks, each Aggregator
+          is required to keep track of the set of reports it has
+          processed for a given task.  Because honest Clients choose the
+          report ID at random, it is sufficient to store the set of IDs
+          of processed reports.  However, implementations may find it
+          helpful to track additional information, like the timestamp,
+          so that the storage used for anti-replay can be sharded
+          efficiently.
 
    7.  If the report pertains to a batch that was previously collected,
        then the input share MUST be marked as invalid with error
@@ -2147,7 +2152,6 @@ struct {} Empty;
    HTTP status code 200 OK and a body consisting of a Collection:
 
    struct {
-     PartialBatchSelector part_batch_selector;
      uint64 report_count;
      Interval interval;
      HpkeCiphertext leader_encrypted_agg_share;
@@ -2156,14 +2160,6 @@ struct {} Empty;
 
    The body's media type is "application/dap-collection".  The
    Collection structure includes the following:
-
-   *  part_batch_selector: Information used to bind the aggregate result
-      to the query.  For fixed_size tasks, this includes the batch ID
-      assigned to the batch by the Leader.  The indicated query type
-      MUST match the task's query type.
-
-      [OPEN ISSUE: What should the Collector do if the query type
-      doesn't match?]
 
    *  report_count: The number of reports included in the batch.
 
@@ -2454,11 +2450,10 @@ enc, payload = SealBase(pk, "dap-10 aggregate share" || server_role || 0x00,
 
    For fixed_size tasks, the batch boundaries are defined by opaque
    batch IDs.  Thus the Aggregator needs to check that the query is
-   associated with a known batch ID:
-
-   *  For an AggregateShareReq, the Helper checks that the batch ID
-      provided by the Leader corresponds to a batch ID used in a
-      previous AggregationJobInitReq for the task.
+   associated with a known batch ID; specifically, for an
+   AggregateShareReq, the Helper checks that the batch ID provided by
+   the Leader corresponds to a batch ID used in a previous
+   AggregationJobInitReq for the task.
 
 4.6.5.2.2.  Size Check
 
@@ -2545,31 +2540,17 @@ enc, payload = SealBase(pk, "dap-10 aggregate share" || server_role || 0x00,
 5.2.  VDAFs and Compute Requirements
 
    The choice of VDAF can impact the computation required for a DAP
-   task.  For instance, the Poplar1 VDAF [VDAF] when configured to
-   compute a set of heavy hitters requires each measurement to be of the
-   same bit-length which all parties need to agree on prior to VDAF
-   execution.  The computation required for such tasks increases
-   superlinearly as a function of the chosen bit-length, as multiple
-   rounds of collection are needed for each bit of the measurement
-   value, and each bit of the measurement value requires computation
-   which scales with the chosen bit-length.
-
-   When dealing with variable length measurements (e.g domain names), it
-   is necessary to pad them to convert into fixed-length measurements.
-   When computing the heavy hitters from a batch of such measurements,
-   VDAF execution can be terminated early once once the padding region
-   is reached for a given measurement: at this point, the padded
-   measurement can be included in the last set of candidate prefixes.
-   For smaller length measurements, this significantly reduces the cost
-   of communication between Aggregators and the steps required for the
-   computation.  However, malicious Clients can still generate maximum
-   length measurements forcing the system to always operate at worst-
-   case performance.
+   task.  For instance, the Prio3SumVec VDAF [VDAF] requires each
+   measurement to be vectors of the same length, which all parties need
+   to agree on prior to VDAF execution.  The computation required for
+   such tasks increases linearly as a function of the chosen length, as
+   each vector element must be processed in turn.
 
    Therefore, care must be taken that a DAP deployment can handle VDAF
-   execution of all possible measurement values for any tasks that the
-   deployment is configured for.  Otherwise, an attacker may deny
-   service by uploading many expensive reports.
+   execution of all possible VDAF configurations for any tasks which the
+   deployment may be configured for.  Otherwise, an attacker may deny
+   service by uploading many expensive reports to a suitably-configured
+   VDAF.
 
    Applications which require computationally-expensive VDAFs can
    mitigate the computation cost of aggregation in a few ways, such as
@@ -2707,6 +2688,11 @@ enc, payload = SealBase(pk, "dap-10 aggregate share" || server_role || 0x00,
 
    3.  Aggregators can deny service by refusing to respond to collection
        requests or aggregate share requests.
+
+   4.  Some VDAFs could leak information to either Aggregator or the
+       Collector beyond what the protocol intended to learn.  It may be
+       possible to mitigate such leakages using differential privacy
+       (Section 7.4).
 
 7.1.  Sybil Attacks
 
