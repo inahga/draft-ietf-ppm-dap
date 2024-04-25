@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-04-23T00:55:55.602519+00:00",
+  "timestamp": "2024-04-25T00:57:50.915035+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -10590,6 +10590,22 @@
       "body": "It should also show what bits need to be \"eventually consistent\" versus transactional.",
       "createdAt": "2024-04-22T20:40:20Z",
       "updatedAt": "2024-04-22T20:40:49Z",
+      "closedAt": null,
+      "comments": []
+    },
+    {
+      "number": 555,
+      "id": "I_kwDOFEJYQs6G17C7",
+      "title": "Consider removing `max_batch_size`.",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/555",
+      "state": "OPEN",
+      "author": "branlwyd",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "Once multi-collection of batches has been removed, we should consider whether the `max_batch_size` parameter of the fixed-size query type might be removed.\r\n\r\nSee https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/pull/554/files#r1577003240 for context; in short, `max_batch_size`'s strongest use-case is in the case of a multiply-collected VDAF. It is unclear if there is a strong justification for this parameter in a DAP which supports only singly-collected VDAFs.",
+      "createdAt": "2024-04-24T22:22:28Z",
+      "updatedAt": "2024-04-24T22:22:28Z",
       "closedAt": null,
       "comments": []
     }
@@ -65791,6 +65807,249 @@
           "createdAt": "2024-02-28T18:29:56Z",
           "updatedAt": "2024-02-28T18:29:56Z",
           "comments": []
+        }
+      ]
+    },
+    {
+      "number": 554,
+      "id": "PR_kwDOFEJYQs5th_h9",
+      "title": "Remove multi-collection of batches.",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/pull/554",
+      "state": "OPEN",
+      "author": "branlwyd",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "This is a prospective change to remove support for multi-collection of batches from DAP, as this was only required for the Heavy Hitters application which will no longer be supported by DAP.\r\n\r\nSpecifically:\r\n * Remove the `max_batch_query_count` task parameter, replacing uses of this parameter with semantics which are equivalent to a `max_batch_query_count` of 1.\r\n * Remove the fixed-size query type's `by_batch_id` query (as well as the `FixedSizeQueryType` message, since there is now only one possibility).\r\n\r\nCloses #259.\r\nCloses #316.\r\nCloses #405.\r\nCloses #409.\r\nCloses #436.",
+      "createdAt": "2024-04-23T23:03:03Z",
+      "updatedAt": "2024-04-24T23:55:50Z",
+      "baseRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
+      "baseRefName": "main",
+      "baseRefOid": "08b67b9afd470bc12c7f13f87449879e5d26ed1c",
+      "headRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
+      "headRefName": "bran/remove-multi-collection",
+      "headRefOid": "7457073b91313f6a2ed7006c5bd17a99df3a3025",
+      "closedAt": null,
+      "mergedAt": null,
+      "mergedBy": null,
+      "mergeCommit": null,
+      "comments": [
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "> Other than the changes suggested by review, I realized we can drop the partial batch selector from the `Collection` message, since this was used to convey the `BatchId` to the Collector for use in `by_batch_id` queries (which have now been removed). Other than making this message a little smaller, this also means that `BatchId`s are now private to the aggregators, which is a nice conceptual simplification for the Collector I suppose.\r\n\r\nThis simplification sounds good to me.\r\n",
+          "createdAt": "2024-04-24T23:55:49Z",
+          "updatedAt": "2024-04-24T23:55:49Z"
+        }
+      ],
+      "reviews": [
+        {
+          "id": "PRR_kwDOFEJYQs54T3vZ",
+          "commit": {
+            "abbreviatedOid": "e6d57ed"
+          },
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "state": "COMMENTED",
+          "body": "",
+          "createdAt": "2024-04-23T23:06:51Z",
+          "updatedAt": "2024-04-23T23:17:53Z",
+          "comments": [
+            {
+              "originalPosition": 70,
+              "body": "It is OK to remove `by_batch_id` because this fixed-size query type was used only for repeated collection of the same batch with differing aggregation parameters. (Recovering from transient failures in collecting a given batch is enabled via re-querying the same collection job ID.)",
+              "createdAt": "2024-04-23T23:06:51Z",
+              "updatedAt": "2024-04-23T23:17:53Z"
+            },
+            {
+              "originalPosition": 132,
+              "body": "I removed this section because:\r\n * The second & third paragraphs only apply to multiply-collected VDAFs.\r\n * The first paragraph boils down to \"you should probably set `min_batch_size` and `max_batch_size` to the same value, and if you don't the Leader can set batches freely to any size between these two values.\"\r\n\r\nShould we remove the concept of `max_batch_size`?",
+              "createdAt": "2024-04-23T23:08:33Z",
+              "updatedAt": "2024-04-23T23:17:53Z"
+            },
+            {
+              "originalPosition": 240,
+              "body": "Is there a need for `Vdaf.is_valid` anymore? It _might_ be used to validate that an aggregation parameter itself is valid (irrespective of other aggregation parameters), but I think this might be better done at some point in evaluating the VDAF rather than via a separate method, for simplicity's sake.",
+              "createdAt": "2024-04-23T23:10:12Z",
+              "updatedAt": "2024-04-23T23:17:53Z"
+            },
+            {
+              "originalPosition": 303,
+              "body": "I'm not sure there is a concrete example to cite here anymore, though I suppose there's nothing stopping a singly-collected VDAF with a nontrivial aggregation parameter from leaking information via the aggregation parameter.",
+              "createdAt": "2024-04-23T23:15:44Z",
+              "updatedAt": "2024-04-23T23:17:53Z"
+            },
+            {
+              "originalPosition": 26,
+              "body": "I dropped references to Poplar1 throughout; I'm not sure if there is anything reasonable to replace it with. (Both PINE & Mastic, IIUC, are not yet to the point where we might cite them.)",
+              "createdAt": "2024-04-23T23:17:18Z",
+              "updatedAt": "2024-04-23T23:17:53Z"
+            }
+          ]
+        },
+        {
+          "id": "PRR_kwDOFEJYQs54bOjg",
+          "commit": {
+            "abbreviatedOid": "e6d57ed"
+          },
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "state": "COMMENTED",
+          "body": "Thanks for taking this on, Bran. Here's a first pass of comments, but I want to go back over the document looking for other things that may need to change.",
+          "createdAt": "2024-04-24T16:37:54Z",
+          "updatedAt": "2024-04-24T17:36:06Z",
+          "comments": [
+            {
+              "originalPosition": 26,
+              "body": "I agree that referencing PINE or Mastic is premature. However I think that here we should replace this list of candidate VDAFs (which now only includes Prio3) with a characterization of the class of VDAFs that DAP supports, which is ones that only admit a single collection of the batch.",
+              "createdAt": "2024-04-24T16:37:54Z",
+              "updatedAt": "2024-04-24T17:36:06Z"
+            },
+            {
+              "originalPosition": 59,
+              "body": "We could move the declaration of `BatchID` closer to where it's first used, in the description of `AggregationJobInitReq`.",
+              "createdAt": "2024-04-24T16:42:36Z",
+              "updatedAt": "2024-04-24T17:36:06Z"
+            },
+            {
+              "originalPosition": 182,
+              "body": "Let's rephrase in terms of concepts defined by the protocol to make this more clear. I'm also concerned that the notion of \"linearity\" discussed in this paragraph isn't introduced anywhere in this document. I assume it's linear in the sense of linear queries as discussed in [BBCGI22](https://eprint.iacr.org/2019/188.pdf) but we should either explain that or remove the unhelpful mention of linearity. Sorry, this suggestion won't apply cleanly, but GitHub won't let me make a suggestion that spans diff and non-diff text.\r\n\r\n```suggestion\r\n   aggregatable form. For some VDAFs, like Prio3, the mapping from input to\r\n   output shares is a fixed operation depending only on the input share, but\r\n   in general the mapping involves an aggregation parameter, chosen\r\n   dynamically by the Collector.\r\n```\r\n\r\n@cjpatton, do you think it's important to define and use the notion of linearity here?",
+              "createdAt": "2024-04-24T16:52:55Z",
+              "updatedAt": "2024-04-24T17:36:06Z"
+            },
+            {
+              "originalPosition": 190,
+              "body": "```suggestion\r\n   that the output shares sum up to an integer in a specific range, while the\r\n   Prio3Histogram variant ({{Section 7.4.4 of !VDAF}}) proves that output\r\n   shares sum up to a one-hot vector representing a contribution to a single\r\n   bucket of the histogram.\r\n```",
+              "createdAt": "2024-04-24T16:56:06Z",
+              "updatedAt": "2024-04-24T17:36:06Z"
+            },
+            {
+              "originalPosition": 240,
+              "body": "Yes, I agree. The check for whether a report has been previously aggregated at all should suffice, and VDAF methods like `prep_init` or `prep_next` should safely reject invalid aggregation parameters. It's still useful for `Vdaf.is_valid` to be defined, because DAP-HH would use it, but DAP doesn't need to call it anymore.",
+              "createdAt": "2024-04-24T17:07:17Z",
+              "updatedAt": "2024-04-24T17:36:06Z"
+            },
+            {
+              "originalPosition": 303,
+              "body": "I think we should leave this in, even without the explicit reference to Poplar1. Even when restricted to collecting batches once, DAP admits many future, unknown VDAFs, and pointing out that VDAFs may leak information (and not just to the collector!) and may need to be composed with DP is a legitimate security consideration. However I don't like the phrasing \"Collection requests may leak information beyond the collection results\" because it seems tautological. Let's try:\r\n\r\n```suggestion\r\n1. Some VDAFs could leak information to either Aggregator or the Collector\r\n   beyond what the protocol intended to learn. It may be possible to mitigate\r\n   such leakages using differential privacy ({{dp}}). \r\n```",
+              "createdAt": "2024-04-24T17:16:11Z",
+              "updatedAt": "2024-04-24T17:36:06Z"
+            }
+          ]
+        },
+        {
+          "id": "PRR_kwDOFEJYQs54c-_O",
+          "commit": {
+            "abbreviatedOid": "e6d57ed"
+          },
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "state": "COMMENTED",
+          "body": "",
+          "createdAt": "2024-04-24T20:16:21Z",
+          "updatedAt": "2024-04-24T20:28:36Z",
+          "comments": [
+            {
+              "originalPosition": 26,
+              "body": "We could keep the \"counting the number of Clients that hold a given string\" use case for Poplar1. This is basically a limited form of attributed based metrics (i.e., Prio3Count with attributes).",
+              "createdAt": "2024-04-24T20:16:21Z",
+              "updatedAt": "2024-04-24T20:28:36Z"
+            },
+            {
+              "originalPosition": 70,
+              "body": "SGTM.",
+              "createdAt": "2024-04-24T20:17:26Z",
+              "updatedAt": "2024-04-24T20:28:36Z"
+            },
+            {
+              "originalPosition": 132,
+              "body": "Let's consider removing `max_batch_size` in a separate issue.",
+              "createdAt": "2024-04-24T20:19:40Z",
+              "updatedAt": "2024-04-24T20:28:36Z"
+            },
+            {
+              "originalPosition": 182,
+              "body": "No I don't think linearity is important. The suggestion looks good to me.",
+              "createdAt": "2024-04-24T20:21:46Z",
+              "updatedAt": "2024-04-24T20:28:36Z"
+            },
+            {
+              "originalPosition": 240,
+              "body": "I think of validity of the agg param as being delegated to decoding on the wire.",
+              "createdAt": "2024-04-24T20:23:56Z",
+              "updatedAt": "2024-04-24T20:28:36Z"
+            },
+            {
+              "originalPosition": 225,
+              "body": "This note is still relevant I think.",
+              "createdAt": "2024-04-24T20:24:37Z",
+              "updatedAt": "2024-04-24T20:28:36Z"
+            },
+            {
+              "originalPosition": 268,
+              "body": "nit: Consider merging the text after the only remaining bullet into this paragraph.",
+              "createdAt": "2024-04-24T20:26:24Z",
+              "updatedAt": "2024-04-24T20:28:36Z"
+            }
+          ]
+        },
+        {
+          "id": "PRR_kwDOFEJYQs54dEz-",
+          "commit": {
+            "abbreviatedOid": "e6d57ed"
+          },
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "state": "COMMENTED",
+          "body": "We should delete [this paragraph](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-10#section-4.5.1.1-16) at L1345:\r\n\r\n> [[OPEN ISSUE: Consider sending report shares separately (in parallel) to the aggregate instructions. Right now, aggregation parameters and the corresponding\r\nreport shares are sent at the same time, but this may not be strictly\r\nnecessary.]]\r\n\r\nThis isn't a concern anymore since we don't support multiple collection, and thus a report will be used exactly once.\r\n\r\nWe should revisit [VDAFs and compute requirements](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-10#name-vdafs-and-compute-requireme) so it doesn't discuss Poplar1 (or delete that and carry it over to the eventual DAP-HH draft).",
+          "createdAt": "2024-04-24T20:31:03Z",
+          "updatedAt": "2024-04-24T21:10:33Z",
+          "comments": [
+            {
+              "originalPosition": 272,
+              "body": "I feel like there should be a reference here to [4.1.2](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-10#name-fixed-size-queries) which discusses how the Leader deals with \"current-batch\" queries. However we can deal with that separately from this PR.",
+              "createdAt": "2024-04-24T20:31:03Z",
+              "updatedAt": "2024-04-24T21:10:33Z"
+            },
+            {
+              "originalPosition": 262,
+              "body": "I think this could be stated more clearly in terms of the batch already having been collected.\r\n```suggestion\r\nNext, the Aggregator checks that the batch has not already been aggregated. If it\r\nhas, then the Aggregator MUST abort with error of type \"batchAlreadyAggregated\".\r\n```\r\n\r\nNote also the error type changes `batchQueriedMultipleTimes => batchAlreadyAggregated`.",
+              "createdAt": "2024-04-24T21:00:43Z",
+              "updatedAt": "2024-04-24T21:10:33Z"
+            }
+          ]
+        },
+        {
+          "id": "PRR_kwDOFEJYQs54dpUR",
+          "commit": {
+            "abbreviatedOid": "7457073"
+          },
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "state": "COMMENTED",
+          "body": "> We should revisit [VDAFs and compute requirements](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-10#name-vdafs-and-compute-requireme) so it doesn't discuss Poplar1 (or delete that and carry it over to the eventual DAP-HH draft).\r\n\r\nDone. I used a Prio3 example since that's the only concrete VDAF we have in hand at the moment, but some of the points regarding superlinearity of processing don't apply to any of the Prio3 variants (AFAIK).\r\n\r\nOther than the changes suggested by review, I realized we can drop the partial batch selector from the `Collection` message, since this was used to convey the `BatchId` to the Collector for use in `by_batch_id` queries (which have now been removed). Other than making this message a little smaller, this also means that `BatchId`s are now private to the aggregators, which is a nice conceptual simplification for the Collector I suppose.",
+          "createdAt": "2024-04-24T22:08:28Z",
+          "updatedAt": "2024-04-24T23:31:44Z",
+          "comments": [
+            {
+              "originalPosition": 26,
+              "body": "I like providing the property.",
+              "createdAt": "2024-04-24T22:08:28Z",
+              "updatedAt": "2024-04-24T23:31:44Z"
+            },
+            {
+              "originalPosition": 132,
+              "body": "Filed https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/555.",
+              "createdAt": "2024-04-24T22:22:38Z",
+              "updatedAt": "2024-04-24T23:31:44Z"
+            },
+            {
+              "originalPosition": 262,
+              "body": "I think the notion of _distinct_ aggregation parameters is still useful. I'd like to maintain the property that the same batch can be collected multiple times with the same aggregation parameter. (Though I'm not sure we really need this property, with or without multiply-collected batches -- but I think if we want to drop that property, we should do so as a separate change.)\r\n\r\nSeparately, I'd like to keep the notion of \"aggregating\" the batch separate from \"querying\"/\"collecting\" the batch, due to the common optimizaton of aggregating before a collection query arrives if the aggregation parameter can be known in advance (e.g. if it's the empty string). An overly-pedantic reader would take the suggested edit as-written to mean that such a pre-aggregated batch can never be collected.",
+              "createdAt": "2024-04-24T22:49:15Z",
+              "updatedAt": "2024-04-24T23:31:44Z"
+            }
+          ]
         }
       ]
     }
