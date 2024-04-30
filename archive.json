@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-04-28T01:00:04.389268+00:00",
+  "timestamp": "2024-04-30T00:55:36.261692+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -65844,7 +65844,7 @@
       "labels": [],
       "body": "This is a prospective change to remove support for multi-collection of batches from DAP, as this was only required for the Heavy Hitters application which will no longer be supported by DAP.\r\n\r\nSpecifically:\r\n * Remove the `max_batch_query_count` task parameter, replacing uses of this parameter with semantics which are equivalent to a `max_batch_query_count` of 1.\r\n * Remove the fixed-size query type's `by_batch_id` query (as well as the `FixedSizeQueryType` message, since there is now only one possibility).\r\n * Remove the `PartialBatchSelector` from the `Collection` message, since this was used only to convey the `BatchId` to the `Collector` for later use of the `by_batch_id` query type, which is now gone. (With this change, Collectors no longer need to be aware of the concept of batch IDs.)\r\n\r\nCloses #259.\r\nCloses #316.\r\nCloses #405.\r\nCloses #409.\r\nCloses #436.",
       "createdAt": "2024-04-23T23:03:03Z",
-      "updatedAt": "2024-04-26T17:09:02Z",
+      "updatedAt": "2024-04-29T16:27:52Z",
       "baseRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
       "baseRefName": "main",
       "baseRefOid": "08b67b9afd470bc12c7f13f87449879e5d26ed1c",
@@ -66092,6 +66092,66 @@
           "createdAt": "2024-04-26T15:05:31Z",
           "updatedAt": "2024-04-26T15:05:31Z",
           "comments": []
+        },
+        {
+          "id": "PRR_kwDOFEJYQs541v4F",
+          "commit": {
+            "abbreviatedOid": "7457073"
+          },
+          "author": "kenluck2001",
+          "authorAssociation": "NONE",
+          "state": "COMMENTED",
+          "body": "",
+          "createdAt": "2024-04-28T21:01:00Z",
+          "updatedAt": "2024-04-28T21:01:01Z",
+          "comments": [
+            {
+              "originalPosition": 307,
+              "body": "Is it possible to effect this repetitive query of the same batch by adopting a rate-limiting scheme that is not tightly bundled with the the underlying DAP. Could we make it loosely coupled?",
+              "createdAt": "2024-04-28T21:01:01Z",
+              "updatedAt": "2024-04-28T21:01:01Z"
+            }
+          ]
+        },
+        {
+          "id": "PRR_kwDOFEJYQs546_Gb",
+          "commit": {
+            "abbreviatedOid": "7457073"
+          },
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "state": "COMMENTED",
+          "body": "",
+          "createdAt": "2024-04-29T14:46:30Z",
+          "updatedAt": "2024-04-29T14:46:30Z",
+          "comments": [
+            {
+              "originalPosition": 307,
+              "body": "What would be the goal of rate limiting?\r\n\r\nThe purpose of querying a batch multiple times is to allow a batch to be aggregated with different aggregation parameters. This enables the tree traversal at the heart of Poplar1's solution to heavy hitters: https://datatracker.ietf.org/meeting/interim-2024-ppm-01/materials/slides-interim-2024-ppm-01-sessa-supporting-heavy-hitters-00",
+              "createdAt": "2024-04-29T14:46:30Z",
+              "updatedAt": "2024-04-29T14:46:30Z"
+            }
+          ]
+        },
+        {
+          "id": "PRR_kwDOFEJYQs548Avo",
+          "commit": {
+            "abbreviatedOid": "7457073"
+          },
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "state": "COMMENTED",
+          "body": "",
+          "createdAt": "2024-04-29T16:27:51Z",
+          "updatedAt": "2024-04-29T16:27:52Z",
+          "comments": [
+            {
+              "originalPosition": 307,
+              "body": "This PR removes the ability to query the same batch multiple times. The purpose of the check this comment was made on is to ensure that we do not collect the same batch multiple times, since doing so may violate the privacy of the reports included in the batch. Thus, we need a solution which permanently blocks the undesirable queries, rather than temporarily rate-limiting them.\r\n\r\nAs Chris notes, before we removed multi-collection in this PR, each query of the same batch used a distinct aggregation parameter. For the Heavy Hitters application, there was a nontrivial rule to check whether a given aggregation parameter could be used given the aggregation parameters already used. Thus, any given solution to the multiple-queries problem would need to be aware of the aggregation parameters in use.",
+              "createdAt": "2024-04-29T16:27:52Z",
+              "updatedAt": "2024-04-29T16:27:52Z"
+            }
+          ]
         }
       ]
     }
