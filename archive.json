@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-04-30T00:55:36.261692+00:00",
+  "timestamp": "2024-05-02T00:55:38.851663+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -112,6 +112,11 @@
       "name": "ietf118",
       "description": "",
       "color": "683A4A"
+    },
+    {
+      "name": "operational considerations",
+      "description": "",
+      "color": "BBCB82"
     }
   ],
   "issues": [
@@ -10605,7 +10610,7 @@
       "labels": [],
       "body": "Once multi-collection of batches has been removed, we should consider whether the `max_batch_size` parameter of the fixed-size query type might be removed.\r\n\r\nSee https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/pull/554/files#r1577003240 for context; in short, `max_batch_size`'s strongest use-case is in the case of a multiply-collected VDAF. It is unclear if there is a strong justification for this parameter in a DAP which supports only singly-collected VDAFs.",
       "createdAt": "2024-04-24T22:22:28Z",
-      "updatedAt": "2024-04-26T16:53:53Z",
+      "updatedAt": "2024-05-01T19:45:14Z",
       "closedAt": null,
       "comments": [
         {
@@ -10628,6 +10633,150 @@
           "body": "Hmm -- I was thinking of the removal of `max_batch_size` as indicating that batches must be exactly `min_batch_size` in size (i.e. if we took this change, we could also rename `min_batch_size` to just `batch_size`). If we want to keep the existing semantics that a missing `max_batch_size` leads to unbounded batch sizes, IMO we should keep `max_batch_size`.",
           "createdAt": "2024-04-26T16:53:37Z",
           "updatedAt": "2024-04-26T16:53:53Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Ah, thanks for clarifying! FWIW, taskprov interprets unspecified max_batch_size as unlimited: https://datatracker.ietf.org/doc/html/draft-wang-ppm-dap-taskprov-06#section-3-9",
+          "createdAt": "2024-05-01T19:45:13Z",
+          "updatedAt": "2024-05-01T19:45:13Z"
+        }
+      ]
+    },
+    {
+      "number": 556,
+      "id": "I_kwDOFEJYQs6Hiqfq",
+      "title": "Discuss distributed systems-related concerns in Operational Considerations section",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/556",
+      "state": "OPEN",
+      "author": "divergentdave",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [
+        "operational considerations"
+      ],
+      "body": "I think it would be helpful to explicitly list what sort of synchronization guarantees the aggregators need to uphold. Some of these are implicit in the text elsewhere, and they would be important to the architecture of a distributed aggregator. Here's what I have so far:\r\n\r\n- Leader\r\n  - The leader has to perform anti-replay checks between receiving a report and sending it in an aggregation job (i.e. deduplicating by ReportMetadata). This is easily amenable to approaches that only provide eventual consistency.\r\n  - The leader needs some synchronization between aggregate share requests and aggregation job requests to make sure it doesn't aggregate any new reports into a batch that has already been collected. This requirement is significantly different between time interval queries, where the client metadata determines the batch, and fixed size query, where the leader has full control of batches.\r\n  - The leader needs to synchronize between sending aggregation job requests and sending aggregate share requests, to ensure that it never has both an aggregate share request collecting a batch and an aggregation job that affects the same batch outstanding at the same time. Note that with time interval queries, there is a many-to-many mapping between aggregation jobs and batches, while with fixed size queries, each aggregation job impacts only one batch.\r\n- Helper\r\n  - The helper needs to perform duplicate report detection across aggregation job requests.\r\n  - The helper needs strong consistency between aggregation job requests and subsequent aggregate share requests, so that it includes every eligible output share in its aggregate share.",
+      "createdAt": "2024-05-01T18:56:18Z",
+      "updatedAt": "2024-05-01T22:38:56Z",
+      "closedAt": null,
+      "comments": [
+        {
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Right now, all of these require explicit \"transactional\"/\"serializable\" synchronization between the relevant components of the system (except for report uploads, as noted).\r\n\r\nReducing these to something requiring only eventual consistency would be valuable even for an implementation using a monolithic database (e.g. Postgres transactions can still encounter distributed systems-like inconsistencies at transaction isolation levels lower than `SERIALIZABLE`, without implementation effort to ensure the appropriate transactions necessarily encounter a write conflict).",
+          "createdAt": "2024-05-01T20:40:54Z",
+          "updatedAt": "2024-05-01T20:40:54Z"
+        }
+      ]
+    },
+    {
+      "number": 557,
+      "id": "I_kwDOFEJYQs6HjBl4",
+      "title": "Explicit backoff logic for aggregation jobs",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/557",
+      "state": "OPEN",
+      "author": "cjpatton",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "As mentioned in #556, replay protection implies a relatively stringent operational requirement for the Helper: many aggregation jobs might make concurrent transactions on the same database, which can easily overwhelm the database if not sufficiently provisioned.\r\n\r\nTo mitigate this problem, the Helper can cancel an aggregation job and ask the Leader to try again later. One option is to respond with HTTP status 429 and a \"retry-after\" header indicating when it should be safe to retry.\r\n\r\nI'd like to suggest that we spell this out explicitly in the draft.",
+      "createdAt": "2024-05-01T20:01:38Z",
+      "updatedAt": "2024-05-01T21:14:23Z",
+      "closedAt": null,
+      "comments": [
+        {
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "body": "One thing we touched on today is: what is the \"unit\" of backoff, e.g. what is the domain over which the retry-after header applies to?\r\n\r\n\r\nPlausible ideas include:\r\n* Only that specific aggregation job\r\n* Aggregation jobs sharing a batch with the backoff'ed aggregation job (this might be tricky for time-interval, where an aggregation job can touch an arbitrary number of different batches)\r\n* All aggregation jobs for the same task as the backoff'ed aggregation job\r\n* All aggregation jobs",
+          "createdAt": "2024-05-01T20:29:04Z",
+          "updatedAt": "2024-05-01T20:29:04Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "For Daphne, it's for jobs sharing a batch \"bucket\":\r\n1. For time-interval tasks, each bucket is a time window\r\n2. For fixed-size queries, there is just one bucket, which is identified by the batch ID.\r\n",
+          "createdAt": "2024-05-01T21:14:22Z",
+          "updatedAt": "2024-05-01T21:14:22Z"
+        }
+      ]
+    },
+    {
+      "number": 558,
+      "id": "I_kwDOFEJYQs6Hjw79",
+      "title": "Thought experiment: no more report ID",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/558",
+      "state": "OPEN",
+      "author": "tgeoghegan",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "#556 enumerates requirements in DAP that can be challenging to meet depending on the architecture of an implementation. Among them is the requirement that aggregators guard against duplicate report IDs. The Leader does this during upload handling and the Helper does it during aggregation job handling. In both cases, the requirement can be difficult to meet because it introduces a global lookup in an operation that would otherwise be embarrassingly parallel, in the sense that it has no dependencies on other data.\r\n\r\nIdeally, the Leader's upload handler would involve just examining the incoming message and then inserting a single row into a table (or a single record into a k-v store, or...), but now it has to check against many previously seen report IDs to check for a collision. Similarly, the preparation of an input share into an output share doesn't require synchronization with any other report's preparation, but the Helper must do a potentially expensive check for the report ID's uniqueness. In particular, this means that aggregators must have a consistent view of storage shared with all other replicas of themselves (or at least a shard of storage).\r\n\r\nSo why actually do we have this requirement of no repeated report IDs? Recalling that the DAP report ID is used as the VDAF nonce, [`draft-irtf-cfrg-vdaf`'s {{nonce-requirements}}](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-vdaf-08#section-9.2) says:\r\n\r\n```\r\nThe sharding and preparation steps of VDAF execution depend on a nonce\r\nassociated with the Client's report. To ensure privacy of the underlying\r\nmeasurement, the Client MUST generate this nonce using a CSPRNG. This is\r\nrequired in order to leverage security analysis for the privacy definition of\r\n{{DPRS23}}, which assumes the nonce is chosen at random prior to generating the\r\nreport.\r\n```\r\n\r\nNonce collisions are definitely a problem, but ours are 16 bytes and so generating them with a CSPRNG gives us a reasonable guarantee of collision avoidance.\r\n\r\nThis section continues:\r\n\r\n```\r\nOther security considerations may require the nonce to be non-repeating. For\r\nexample, to achieve differential privacy it is necessary to avoid \"over\r\nexposing\" a measurement by including it too many times in a single batch or\r\nacross multiple batches. It is RECOMMENDED that the nonce generated by the\r\nClient be used by the Aggregators for replay protection.\r\n```\r\n\r\nIf the attack is a malicious client including a single measurement in a batch \"too many times\", then I don't think report ID/nonce uniqueness helps: the malicious client could just send the desired measurement multiple times under distinct report IDs and have them incorporated into the batch.\r\n\r\nFurther, the report ID is never used in DAP to uniquely identify a report, except to enable anti-replay checks. It's not possible to GET a report from `/tasks/{task-id}/reports/{report-id}`. Aggregators never exchange a list of report IDs, either: instead, aggregation jobs contain whole report shares inline, and both collection job and aggregate share requests contain selectors that inform how aggregators will construct batches. In the time interval case, the report's timestamp is used, and for fixed size queries, the Leader arbitrarily assigns reports to batches. An aggregator implementation will certainly need some unique report identifier to keep track of which batch reports belong to, but that can be an implementation detail, generated inside either aggregator, and thus wouldn't require anything in the protocol to rule out duplicates. Crucially, we can trust an aggregator to correctly generate its own primary keys.\r\n\r\nThere are a handful of protocol messages where report ID appears, but really what's being transmitted there is the VDAF nonce, so we could just rename those fields.\r\n\r\nI'm coming around to the view that we could remove the notion of unique report IDs from DAP, and thus delete the attendant uniqueness requirement. Unless, that is, there's some other reason that aggregators must guarantee that there are no nonce collisions in a task?",
+      "createdAt": "2024-05-01T22:36:03Z",
+      "updatedAt": "2024-05-01T23:27:17Z",
+      "closedAt": null,
+      "comments": [
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "We're not concerned with a malicious client violating its own privacy, so the question is whether a malicious client choosing its nonce allows attacks on anyone else's privacy. The threat model assumes that an attacker can control both an aggregator and a coalition of clients. So the malicious aggregator could observe the nonce of an honest client's report, and then have a malicious client use that nonce in a report. Does this violate the privacy of the honest client?",
+          "createdAt": "2024-05-01T22:39:07Z",
+          "updatedAt": "2024-05-01T22:39:07Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "> If the attack is a malicious client including a single measurement in a batch \"too many times\", then I don't think report ID/nonce uniqueness helps: the malicious client could just send the desired measurement multiple times under distinct report IDs and have them incorporated into the batch.\r\n\r\nTrue, but to be clear: we are concerned about a malicious Aggregator replaying an honest Client's report too many times.\r\n\r\n> We're not concerned with a malicious client violating its own privacy, so the question is whether a malicious client choosing its nonce allows attacks on anyone else's privacy. The threat model assumes that an attacker can control both an aggregator and a coalition of clients. So the malicious aggregator could observe the nonce of an honest client's report, and then have a malicious client use that nonce in a report. Does this violate the privacy of the honest client?\r\n\r\nNo, as long as the honest Aggregator only processes a report with that nonce once. ",
+          "createdAt": "2024-05-01T22:46:33Z",
+          "updatedAt": "2024-05-01T22:46:33Z"
+        },
+        {
+          "author": "divergentdave",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Enforcing report ID uniqueness is useful because it is cheaper than enforcing uniqueness of the rest of the contents of a report. We extend the protection against duplicate report IDs to protection against replayed report contents by binding the decryption of input shares to the report ID. One replay attack we need to defend against is when the adversary controls the leader, and it sends report shares from an honest client's report multiple times, either in one batch or across multiple batches. This is what the \"over exposing\" paragraph is referring to, rather than the attacker freshly generating multiple reports with the same measurement.",
+          "createdAt": "2024-05-01T22:47:11Z",
+          "updatedAt": "2024-05-01T22:47:11Z"
+        },
+        {
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Removing the report ID does not remove the requirement on the report's uniqueness--e.g. if a malicious Leader could repeatedly include the same report in multiple batches, it would be able to violate the privacy of that report, whether the report has an attached ID or not.\r\n\r\nI think removing the ID would make it more complicated for an aggregator to determine a report's identity. For example, they might derive an identity based on the hash of appropriate parts of the report's content, or even the entire content of the report. I think we'd probably need to spell out how a report's identity is determined in the spec.\r\n\r\nDepending on how the AADs change & how report identity is determined, removing the report ID might also allow a malicious aggregator to forge reports using a \"real\" report's measurement, effectively allowing the privacy of that report to be violated.",
+          "createdAt": "2024-05-01T22:47:20Z",
+          "updatedAt": "2024-05-01T22:47:20Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "One bit of related trivia, inspired by this conversation: checking for replay across batches is harder for fixed-size tasks than for time-interval tasks. In particular, this implementation detail is expensive for Daphne:\r\n\r\n>  An aggregator implementation will certainly need some unique report identifier to keep track of which batch reports belong to, but that can be an implementation detail, ...\r\n\r\n\r\n",
+          "createdAt": "2024-05-01T22:54:52Z",
+          "updatedAt": "2024-05-01T22:54:52Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "I think I am persuaded by the argument that we have to prevent the Leader from replaying an honest Client's report: this is not equivalent to doing a Sybil attack where the same measurement is repeatedly uploaded, because the malicious Leader can do this without knowing the honest Client's measurement, and could learn what that measurement is by constructing a batch containing exclusively the honest Client report. So on that basis alone, I'm convinced we have to keep report IDs and the anti-replay check (though perhaps only in the Helper...)\r\n\r\nBut there's one more thing I want to make sure I understand, and would like to have on the record:\r\n\r\n@cjpatton wrote:\r\n> No, as long as the honest Aggregator only processes a report with that nonce once.\r\n\r\nForgetting over exposure for a second, let's say two different reports containing two different measurements both use the same nonce. Is that a problem? Why?",
+          "createdAt": "2024-05-01T22:57:18Z",
+          "updatedAt": "2024-05-01T22:57:18Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "It's definitely problematic from the standpoint of the proven security of Prio3,: ia.cr/2023/130, Theorem 2 says that privacy only holds up to nonce collisions. So if two clients, honest or not, happen to choose the same nonce, and we process both reports, then the attacker might learn something it's not supposed to.\r\n\r\n[This is a little speculative, and I may not have the details pinned down.] To make this more concrete: in Prio3 we evaluate the proof polynomial at a random point derived from the nonce. In addition, we get to learn some intermediate outputs. Normally those intermediate outputs don't leak anything, if the random point is indeed independent across all executions of the FLP. But in this situation, this is not the case.",
+          "createdAt": "2024-05-01T23:11:33Z",
+          "updatedAt": "2024-05-01T23:11:33Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "OK, thanks. While you've collectively talked me off the ledge of killing report IDs, I think we could use a touch more text in VDAF and DAP:\r\n\r\n- [VDAF {{nonce-requirements}}](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-vdaf-08#section-9.2) only says clients MUST randomly generate the nonce, but clearly that's not enough. We should add a sentence about aggregators verifying that there are no nonce collisions.\r\n- DAP should spell out that besides meeting the requirement from VDAF 9.2, enforcing report ID uniqueness prevents the leader from replaying an honest client's report, to stop dimwits like me from arguing to remove the report ID.\r\n",
+          "createdAt": "2024-05-01T23:25:19Z",
+          "updatedAt": "2024-05-01T23:25:19Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Finally: I notice that section 4.5.1.4 _currently_ lacks explicit instruction that the helper should reject duplicate report IDs, but #554 addresses this by replacing the call to `Vdaf.is_valid` with\r\n\r\n> Check if the report has been previously aggregated. If so, the input share\r\n> MUST be marked as invalid with the error `report_replayed`.",
+          "createdAt": "2024-05-01T23:27:16Z",
+          "updatedAt": "2024-05-01T23:27:16Z"
         }
       ]
     }
@@ -65844,7 +65993,7 @@
       "labels": [],
       "body": "This is a prospective change to remove support for multi-collection of batches from DAP, as this was only required for the Heavy Hitters application which will no longer be supported by DAP.\r\n\r\nSpecifically:\r\n * Remove the `max_batch_query_count` task parameter, replacing uses of this parameter with semantics which are equivalent to a `max_batch_query_count` of 1.\r\n * Remove the fixed-size query type's `by_batch_id` query (as well as the `FixedSizeQueryType` message, since there is now only one possibility).\r\n * Remove the `PartialBatchSelector` from the `Collection` message, since this was used only to convey the `BatchId` to the `Collector` for later use of the `by_batch_id` query type, which is now gone. (With this change, Collectors no longer need to be aware of the concept of batch IDs.)\r\n\r\nCloses #259.\r\nCloses #316.\r\nCloses #405.\r\nCloses #409.\r\nCloses #436.",
       "createdAt": "2024-04-23T23:03:03Z",
-      "updatedAt": "2024-04-29T16:27:52Z",
+      "updatedAt": "2024-05-01T23:22:50Z",
       "baseRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
       "baseRefName": "main",
       "baseRefOid": "08b67b9afd470bc12c7f13f87449879e5d26ed1c",
