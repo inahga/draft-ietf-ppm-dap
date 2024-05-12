@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-05-09T00:56:47.575760+00:00",
+  "timestamp": "2024-05-12T01:01:34.536106+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -9563,7 +9563,7 @@
       ],
       "body": "In #393, we define a union with an enum discriminant roughly like:\r\n\r\n```\r\nenum {\r\n  continue(0),\r\n  finished(1)\r\n  reject(2),\r\n  (255)\r\n} PrepareStepState;\r\n\r\nstruct {\r\n  PrepareStepState prepare_step_state;\r\n  select (PrepareStep.prepare_step_state) {\r\n    case continue:\r\n      ReportId report_id;\r\n      opaque payload<0..2^32-1>;\r\n    case finished:\r\n      ReportId report_id;\r\n    case reject:\r\n      ReportId report_id;\r\n      ReportShareError report_share_error;\r\n  };\r\n} PrepareStep;\r\n```\r\n\r\nThen later in protocol text, we define partial constructions of values like:\r\n\r\n```\r\nstruct {\r\n  PrepareStepState prepare_step_state = 2; /* reject */\r\n  ReportId report_id;\r\n  ReportShareError report_share_error;\r\n} PrepareStep;\r\n```\r\n\r\nThis notation is clear and certainly is more compact than a paragraph explaining to implementers what enum variant to use, but it conflicts with [section 3.7 of RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446#section-3.7), which tells us that this is the notation for defining structs that contain fields whose values are fixed (I gather this was useful in TLS 1.3 for backward compatibility with older TLS versions).\r\n\r\nWe can resolve this by adding some text to \"Conventions and Definitions\", where we introduce the usage of RFC 8446 presentation language, explaining our extensions and deviations. There may also be some prior art in other TLS WG documents we can reference, but I haven't found it.",
       "createdAt": "2023-06-14T18:22:32Z",
-      "updatedAt": "2023-11-07T13:49:17Z",
+      "updatedAt": "2024-05-09T18:06:42Z",
       "closedAt": null,
       "comments": [
         {
@@ -9635,6 +9635,13 @@
           "body": "At IETF 118 people were mostly inclined to clarify in the draft any discrepancies with TLS-syntax as they arise. @chris-wood offered an alternative option, which is to adopt QUIC-representation language, which may be expressive enough for our purposes. We decided to look at a PR and make a decision then if the wire change is worth the effort.",
           "createdAt": "2023-11-07T13:49:06Z",
           "updatedAt": "2023-11-07T13:49:06Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "[RFC 9420 2.1](https://datatracker.ietf.org/doc/html/rfc9420#name-presentation-language) has some prior art on documenting extensions to TLS PR. And actually we should check whether we want to adopt their optional and variable length vector notation.",
+          "createdAt": "2024-05-09T18:06:42Z",
+          "updatedAt": "2024-05-09T18:06:42Z"
         }
       ]
     },
@@ -10791,6 +10798,41 @@
           "body": "We took https://github.com/cfrg/draft-irtf-cfrg-vdaf/pull/340 and #559 for this. Nothing left to be done here.",
           "createdAt": "2024-05-08T16:24:13Z",
           "updatedAt": "2024-05-08T16:24:13Z"
+        }
+      ]
+    },
+    {
+      "number": 560,
+      "id": "I_kwDOFEJYQs6IYsmH",
+      "title": "Discuss lifecycle of various objects and how they relate to each other",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/560",
+      "state": "OPEN",
+      "author": "tgeoghegan",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [
+        "tgeoghegan"
+      ],
+      "labels": [
+        "editorial"
+      ],
+      "body": "On the mailing list, @wbl observed that it's hard for readers to understand the relationship of reports to aggregation jobs to batches to aggregate shares. We should add a section between the introduction and the the sections describing the sub-interactions which discusses the lifecycle and cardinality of these objects. ",
+      "createdAt": "2024-05-09T17:50:22Z",
+      "updatedAt": "2024-05-10T00:09:52Z",
+      "closedAt": null,
+      "comments": [
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Mailing list thread in question: https://mailarchive.ietf.org/arch/msg/ppm/E1OAX-HKwknXGevr5EmVjSEdOtE/",
+          "createdAt": "2024-05-09T17:51:19Z",
+          "updatedAt": "2024-05-09T17:51:19Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "One reason this can be confusing is the notion of \"eager\" aggregation, which is doable for VDAFs like Prio3 that don't have aggregation parameters. Simon noted in #385 that this is confusing, and perhaps we could clear this up by making the notion of eager aggregation more explicit in DAP.\r\n\r\nThere's an awkward tension here: we've avoided explicitly discussing eager aggregation, partial aggregates, etc. because technically those concepts are implementation details of a specific aggregator. For instance it'd be perfectly OK for the helper to do eager aggregation into buckets, but for the leader to retain individual output shares until it's time to construct aggregate shares. Neither needs to know how the other handles this, and for that reason it didn't seem appropriate to discuss the concepts in a protocol document whose principal goal is to specify interfaces between participants, not implementation details. But of course now it seems this implementation detail is leaking into the protocol, in that we take enabling this strategy to be a hard requirement for the protocol.",
+          "createdAt": "2024-05-09T18:01:07Z",
+          "updatedAt": "2024-05-10T00:09:52Z"
         }
       ]
     }
