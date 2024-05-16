@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-05-14T00:57:42.676081+00:00",
+  "timestamp": "2024-05-16T00:57:50.143885+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -10817,7 +10817,7 @@
       ],
       "body": "On the mailing list, @wbl observed that it's hard for readers to understand the relationship of reports to aggregation jobs to batches to aggregate shares. We should add a section between the introduction and the the sections describing the sub-interactions which discusses the lifecycle and cardinality of these objects. ",
       "createdAt": "2024-05-09T17:50:22Z",
-      "updatedAt": "2024-05-10T00:09:52Z",
+      "updatedAt": "2024-05-14T21:23:16Z",
       "closedAt": null,
       "comments": [
         {
@@ -10833,6 +10833,13 @@
           "body": "One reason this can be confusing is the notion of \"eager\" aggregation, which is doable for VDAFs like Prio3 that don't have aggregation parameters. Simon noted in #385 that this is confusing, and perhaps we could clear this up by making the notion of eager aggregation more explicit in DAP.\r\n\r\nThere's an awkward tension here: we've avoided explicitly discussing eager aggregation, partial aggregates, etc. because technically those concepts are implementation details of a specific aggregator. For instance it'd be perfectly OK for the helper to do eager aggregation into buckets, but for the leader to retain individual output shares until it's time to construct aggregate shares. Neither needs to know how the other handles this, and for that reason it didn't seem appropriate to discuss the concepts in a protocol document whose principal goal is to specify interfaces between participants, not implementation details. But of course now it seems this implementation detail is leaking into the protocol, in that we take enabling this strategy to be a hard requirement for the protocol.",
           "createdAt": "2024-05-09T18:01:07Z",
           "updatedAt": "2024-05-10T00:09:52Z"
+        },
+        {
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "body": "I think it would be useful to discuss lifecycles, but the DAP spec has historically avoided being too prescriptive about lifetimes/deletion -- IMO we should remain descriptive rather than prescriptive, and if we are prescriptive, say as little as possible. (I suppose the goal is to proscribe the minmimal amount of behavior leading implementations to be interoperable.)",
+          "createdAt": "2024-05-14T21:23:15Z",
+          "updatedAt": "2024-05-14T21:23:15Z"
         }
       ]
     }
@@ -66049,13 +66056,13 @@
       "labels": [],
       "body": "This is a prospective change to remove support for multi-collection of batches from DAP, as this was only required for the Heavy Hitters application which will no longer be supported by DAP.\r\n\r\nSpecifically:\r\n * Remove the `max_batch_query_count` task parameter, replacing uses of this parameter with semantics which are equivalent to a `max_batch_query_count` of 1.\r\n * Remove the fixed-size query type's `by_batch_id` query (as well as the `FixedSizeQueryType` message, since there is now only one possibility).\r\n * Remove the `PartialBatchSelector` from the `Collection` message, since this was used only to convey the `BatchId` to the `Collector` for later use of the `by_batch_id` query type, which is now gone. (With this change, Collectors no longer need to be aware of the concept of batch IDs.)\r\n\r\nCloses #259.\r\nCloses #316.\r\nCloses #405.\r\nCloses #409.\r\nCloses #436.",
       "createdAt": "2024-04-23T23:03:03Z",
-      "updatedAt": "2024-05-01T23:22:50Z",
+      "updatedAt": "2024-05-14T23:48:53Z",
       "baseRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
       "baseRefName": "main",
-      "baseRefOid": "08b67b9afd470bc12c7f13f87449879e5d26ed1c",
+      "baseRefOid": "919fe97674dae0be68b52f40892883aafc5d77bf",
       "headRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
       "headRefName": "bran/remove-multi-collection",
-      "headRefOid": "7457073b91313f6a2ed7006c5bd17a99df3a3025",
+      "headRefOid": "25fb1cb293186fb28e37652e5b8a05d7cf049ddb",
       "closedAt": null,
       "mergedAt": null,
       "mergedBy": null,
@@ -66074,6 +66081,13 @@
           "body": "I think this change is in good shape, but we need to get a consensus call in the WG before we take it.",
           "createdAt": "2024-04-26T00:11:43Z",
           "updatedAt": "2024-04-26T00:11:43Z"
+        },
+        {
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Rebased & squashed. I'm going to hold off on merging this for a few days to allow for any final comments.",
+          "createdAt": "2024-05-14T23:48:52Z",
+          "updatedAt": "2024-05-14T23:48:52Z"
         }
       ],
       "reviews": [
