@@ -1430,6 +1430,12 @@ input is ever seen in the clear by any aggregator.<a href="#section-1-1" class="
             <p id="section-1.1-3.1.1">Remove support for multi-collection of batches, as well as the fixed-size
 query type's <code>by_batch_id</code> query. (*)<a href="#section-1.1-3.1.1" class="pilcrow">¶</a></p>
 </li>
+          <li class="normal" id="section-1.1-3.2">
+            <p id="section-1.1-3.2.1">Clarify purpose of report ID uniqueness.<a href="#section-1.1-3.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-1.1-3.3">
+            <p id="section-1.1-3.3.1">Bump version tag from "dap-10" to "dap-11". (*)<a href="#section-1.1-3.3.1" class="pilcrow">¶</a></p>
+</li>
         </ul>
 <p id="section-1.1-4">10:<a href="#section-1.1-4" class="pilcrow">¶</a></p>
 <ul class="normal">
@@ -2619,7 +2625,7 @@ follows:<a href="#section-4.4.2-13" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-4.4.2-14">
 <pre>
 enc, payload = SealBase(pk,
-  "dap-10 input share" || 0x01 || server_role,
+  "dap-11 input share" || 0x01 || server_role,
   input_share_aad, plaintext_input_share)
 </pre><a href="#section-4.4.2-14" class="pilcrow">¶</a>
 </div>
@@ -3227,7 +3233,7 @@ attempts decryption of the payload with the following procedure:<a href="#sectio
 <div class="alignLeft art-text artwork" id="section-4.5.1.3-2">
 <pre>
 plaintext_input_share = OpenBase(encrypted_input_share.enc, sk,
-  "dap-10 input share" || 0x01 || server_role,
+  "dap-11 input share" || 0x01 || server_role,
   input_share_aad, encrypted_input_share.payload)
 </pre><a href="#section-4.5.1.3-2" class="pilcrow">¶</a>
 </div>
@@ -3863,7 +3869,7 @@ agg_result = Vdaf.unshard(agg_param,
 done as follows:<a href="#section-4.6.4-1" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-4.6.4-2">
 <pre>
-enc, payload = SealBase(pk, "dap-10 aggregate share" || server_role || 0x00,
+enc, payload = SealBase(pk, "dap-11 aggregate share" || server_role || 0x00,
   agg_share_aad, agg_share)
 </pre><a href="#section-4.6.4-2" class="pilcrow">¶</a>
 </div>
@@ -3900,7 +3906,7 @@ Specifically, given an encrypted input share, denoted <code>enc_share</code>, fo
 batch selector, decryption works as follows:<a href="#section-4.6.4-6" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-4.6.4-7">
 <pre>
-agg_share = OpenBase(enc_share.enc, sk, "dap-10 aggregate share" ||
+agg_share = OpenBase(enc_share.enc, sk, "dap-11 aggregate share" ||
   server_role || 0x00, agg_share_aad, enc_share.payload)
 </pre><a href="#section-4.6.4-7" class="pilcrow">¶</a>
 </div>

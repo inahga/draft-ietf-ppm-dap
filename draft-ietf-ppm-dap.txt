@@ -173,6 +173,10 @@ Table of Contents
    *  Remove support for multi-collection of batches, as well as the
       fixed-size query type's by_batch_id query. (*)
 
+   *  Clarify purpose of report ID uniqueness.
+
+   *  Bump version tag from "dap-10" to "dap-11". (*)
+
    10:
 
    *  Editorial changes from httpdir early review.
@@ -1171,7 +1175,7 @@ struct {} Empty;
    plaintext_input_share as follows:
 
    enc, payload = SealBase(pk,
-     "dap-10 input share" || 0x01 || server_role,
+     "dap-11 input share" || 0x01 || server_role,
      input_share_aad, plaintext_input_share)
 
    where pk is the Aggregator's public key; 0x01 represents the Role of
@@ -1729,7 +1733,7 @@ struct {} Empty;
    and attempts decryption of the payload with the following procedure:
 
    plaintext_input_share = OpenBase(encrypted_input_share.enc, sk,
-     "dap-10 input share" || 0x01 || server_role,
+     "dap-11 input share" || 0x01 || server_role,
      input_share_aad, encrypted_input_share.payload)
 
    where sk is the HPKE secret key, 0x01 represents the Role of the
@@ -2326,7 +2330,7 @@ struct {} Empty;
    Encrypting an aggregate share agg_share for a given AggregateShareReq
    is done as follows:
 
-enc, payload = SealBase(pk, "dap-10 aggregate share" || server_role || 0x00,
+enc, payload = SealBase(pk, "dap-11 aggregate share" || server_role || 0x00,
   agg_share_aad, agg_share)
 
    where pk is the HPKE public key encoded by the Collector's HPKE key,
@@ -2356,7 +2360,7 @@ enc, payload = SealBase(pk, "dap-10 aggregate share" || server_role || 0x00,
    process.  Specifically, given an encrypted input share, denoted
    enc_share, for a given batch selector, decryption works as follows:
 
-   agg_share = OpenBase(enc_share.enc, sk, "dap-10 aggregate share" ||
+   agg_share = OpenBase(enc_share.enc, sk, "dap-11 aggregate share" ||
      server_role || 0x00, agg_share_aad, enc_share.payload)
 
    where sk is the HPKE secret key, server_role is the Role of the
