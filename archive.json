@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-05-21T00:57:47.894465+00:00",
+  "timestamp": "2024-05-23T00:57:36.795567+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -5067,7 +5067,7 @@
       "id": "I_kwDOFEJYQs5J78Wa",
       "title": "Checking `batch-collected` at time of aggregate initalization is insufficient",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/259",
-      "state": "OPEN",
+      "state": "CLOSED",
       "author": "divergentdave",
       "authorAssociation": "COLLABORATOR",
       "assignees": [
@@ -5078,8 +5078,8 @@
       ],
       "body": "I think that there is a hole in our anti-replay requirements, for tasks with `max_batch_lifetime > 1`. The issue is that currently, we only require that aggregators check if reports fall in intervals that have already been collected during the leader and helper aggregate initialization, see section `input-share-batch-validation`. We need a similar check either when handling aggregation continuations or the collect flow.\r\n\r\nAs an example of what we should be disallowing, consider a task with `min_batch_size = 10, max_batch_lifetime = 2`. Let's say that all aggregations are done with the same aggregation parameter, whatever it is.\r\n\r\n- The leader sends out an AggregateInitializeReq for its first job, with ten reports.\r\n  - The input share validation checks succeed, as there have been no collect reqeusts yet.\r\n- The leader sends out an AggregateInitializeReq for its second job, with one report. This succeeds as well.\r\n- The leader sends an AggregateContinueReq for its first job, with `finished` transitions.\r\n- The leader sends an AggregateShareReq for an interval that covers all reports in both jobs.\r\n- The leader sends an AggregateContinueReq for its second job, with `finished` transitions.\r\n  - Note that we do not require the helper to do any checks against collect requests when handling aggregation continuations. (see `agg-continue-flow`)\r\n- The leader sends a second AggregateShareReq, identical to the previous request.\r\n  - Note that the checks in `batch-parameter-validation` pass.\r\n    - The batch includes eleven reports, so `min_batch_size` is satisfied.\r\n    - We assumed `max_batch_lifetime = 2`, and each report has been collected zero or one times thus far.\r\n  - Aside from the `max_batch_lifetime` condition, the `collect-aggregate` section does not impose any other checks or conditions requiring the helper to consider previous AggregateShareReq requests when deciding if a request is valid, nor does it require that identical requests always get the same response.\r\n\r\nAfter receiving the two aggregate shares produced above, the collector could compute the aggregate function over both the first ten reports and all eleven reports. For many functions, this would allow recovery of the eleventh input, breaking our privacy goal.\r\n\r\nThere is a paragraph that says:\r\n\r\n> After issuing an aggregate-share request for a given batch interval, it is an error for the leader to issue any more aggregate or aggregate-init requests for additional reports in the batch interval. These reports will be rejected by helpers as described {{agg-init}}.\r\n\r\nHowever, the referenced section only covers the \"aggregate-init\" part, and not aggregate continuation.",
       "createdAt": "2022-05-18T19:58:46Z",
-      "updatedAt": "2023-11-08T15:07:35Z",
-      "closedAt": null,
+      "updatedAt": "2024-05-21T20:58:53Z",
+      "closedAt": "2024-05-21T20:58:53Z",
       "comments": [
         {
           "author": "cjpatton",
@@ -6612,7 +6612,7 @@
       "id": "I_kwDOFEJYQs5RSy9A",
       "title": "Consider tying nonces to shares within a batch.",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/316",
-      "state": "OPEN",
+      "state": "CLOSED",
       "author": "hannahdaviscrypto",
       "authorAssociation": "NONE",
       "assignees": [
@@ -6623,8 +6623,8 @@
       ],
       "body": "DAP uses a checksum over the report nonces to make sure that the same set of reports are included in repeated batches, but it does not verify the consistency of the ciphertexts  and input shares themselves between collect requests. In situations where max_batch_lifetime >=2, it may be possible for a a malicious leader to change the input share for a given nonce between two collect requests over the same batch interval. Replays are currently prevented by putting the nonce in the AAD of HPKE for client reports; however this does not protect against nonce replays with changed input shares by malicious clients. This could be of particular concern for Poplar, where multiple collect requests are used to explore a binary tree that is expected not to change between aggregations. \r\n\r\nCould we consider additional verification strategies for honest aggregators/helpers to ensure that every repeated batch interval contains the same input shares as well as the same nonces?",
       "createdAt": "2022-09-06T22:31:29Z",
-      "updatedAt": "2023-11-08T15:07:49Z",
-      "closedAt": null,
+      "updatedAt": "2024-05-21T20:58:53Z",
+      "closedAt": "2024-05-21T20:58:53Z",
       "comments": [
         {
           "author": "tgeoghegan",
@@ -7996,7 +7996,7 @@
       "id": "I_kwDOFEJYQs5d3cH5",
       "title": "Decoupling the aggregation parameter from aggregation jobs",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/405",
-      "state": "OPEN",
+      "state": "CLOSED",
       "author": "tgeoghegan",
       "authorAssociation": "COLLABORATOR",
       "assignees": [
@@ -8007,8 +8007,8 @@
       ],
       "body": "Currently, the leader transmits aggregation parameters to the helper in an `AggregationJobInitReq`. Servicing a collection request can require arbitrarily many aggregation jobs (the leader chooses how many jobs to schedule), but all of them will have the same aggregation parameter value. This is fine for Prio3, because there is no aggregation parameter and thus it takes up no space in the wire message. But if a VDAF happens to have a large aggregation parameter (as is likely to be the case for Poplar1), then it's wasteful to retransmit the exact same aggregation parameter many times.",
       "createdAt": "2023-02-07T18:12:39Z",
-      "updatedAt": "2024-02-24T00:41:32Z",
-      "closedAt": null,
+      "updatedAt": "2024-05-21T20:58:54Z",
+      "closedAt": "2024-05-21T20:58:54Z",
       "comments": [
         {
           "author": "tgeoghegan",
@@ -8262,7 +8262,7 @@
       "id": "I_kwDOFEJYQs5elLZa",
       "title": "Decouple transmission of report shares from leader to helper from aggregation job creation",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/409",
-      "state": "OPEN",
+      "state": "CLOSED",
       "author": "tgeoghegan",
       "authorAssociation": "COLLABORATOR",
       "assignees": [
@@ -8273,8 +8273,8 @@
       ],
       "body": "Currently, the leader transmits encrypted report shares to the helper inline in an `AggregationJobInitReq` message. This is inefficient in the face of VDAFs that allow querying the same batch of reports multiple times with different aggregation parameters. Given the current protocol, those report shares must be retransmitted from leader to helper each time. This could be a significant waste of bandwidth, depending on the size of report shares and the number of collections that will be run against a batch.",
       "createdAt": "2023-02-16T00:34:52Z",
-      "updatedAt": "2023-11-08T15:08:24Z",
-      "closedAt": null,
+      "updatedAt": "2024-05-21T20:58:54Z",
+      "closedAt": "2024-05-21T20:58:54Z",
       "comments": [
         {
           "author": "tgeoghegan",
@@ -8517,7 +8517,7 @@
       "id": "I_kwDOFEJYQs5jXCau",
       "title": "Do we still need `max_batch_query_count`?",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/436",
-      "state": "OPEN",
+      "state": "CLOSED",
       "author": "cjpatton",
       "authorAssociation": "COLLABORATOR",
       "assignees": [
@@ -8528,8 +8528,8 @@
       ],
       "body": "This seems redundant now that w'ere now enforcing this restriction at the VDAF level:\r\n\r\n> Check if the report may still be aggregated with the current aggregation parameter. This can be done by looking up all aggregation parameters previously used for this report and calling\r\n>\r\n> `VDAF.is_valid(current_agg_param, previous_agg_params)`\r\n>\r\n> If this returns false, the input share MUST be marked as invalid with the error report_replayed.",
       "createdAt": "2023-04-13T19:04:38Z",
-      "updatedAt": "2023-11-08T15:08:14Z",
-      "closedAt": null,
+      "updatedAt": "2024-05-21T20:58:54Z",
+      "closedAt": "2024-05-21T20:58:54Z",
       "comments": [
         {
           "author": "divergentdave",
@@ -10862,9 +10862,17 @@
       ],
       "body": "There is a [new paper](https://eprint.iacr.org/2024/666) (to appear at IEEE S&P 2024) that shows how to lift an [FLP](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-vdaf-09#section-7.1) into a proof system that is \"silently verifiable\". For such a proof system, it's possible to check if _some_ measurement in a set of measurements is invalid, exchanging only a constant number of bits (128). In Prio3, we must exchange a number of bits linear in the number of measurements.\r\n\r\nThe bandwidth savings are significant. For Prio3SumVec with bits=1, length=1,000, and chunk_length=32 and 100 reports, an `AggregationJobInitReq` is 122KB. If we modified Prio3 by making the FLP silently verifiable, the same message would be roughly 7KB (back-of-a-napkin calculation). Computational cost remains about the same. (See Figure 7 from the paper for details.)\r\n\r\nThis approach does a have a potential downside: if verification fails, then we learn only that _some_ measurement is invalid, not _which_ measurement is invalid. Thus, in the case that some fraction of the reports in the aggregation job, you either need to throw away the data or exchange more bits in order to find the subset of measurements that are invalid. The communication cost increases as the fraction of malicious Clients increases.\r\n\r\nThere are many ways we might implement this. Perhaps the simplest would be to treat batched preparation as an alternative aggregation flow that falls back to the existing aggregation flow (i.e., per report validation) if verification fails. Concretely, we would specify an alternative aggregation sub-protocol that is the same as the existing flow except:\r\n1. It is only compatible with 1-round, \"silently verifiable\" VDAFs.\r\n2. If verification fails, then it needs to be safe to fallback to per-report validation.\r\n\r\n\r\n\r\n\r\n\r\n\r\n",
       "createdAt": "2024-05-16T23:48:08Z",
-      "updatedAt": "2024-05-17T00:57:38Z",
+      "updatedAt": "2024-05-21T18:46:23Z",
       "closedAt": null,
-      "comments": []
+      "comments": [
+        {
+          "author": "wbl",
+          "authorAssociation": "NONE",
+          "body": "Via coding theory you can survive a handful of bad reports and remove them (https://www.nature.com/articles/s41586-020-2885-5 is one reference but there are others)",
+          "createdAt": "2024-05-21T18:46:22Z",
+          "updatedAt": "2024-05-21T18:46:22Z"
+        }
+      ]
     }
   ],
   "pulls": [
@@ -66072,24 +66080,26 @@
       "id": "PR_kwDOFEJYQs5th_h9",
       "title": "Remove multi-collection of batches.",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/pull/554",
-      "state": "OPEN",
+      "state": "MERGED",
       "author": "branlwyd",
       "authorAssociation": "COLLABORATOR",
       "assignees": [],
       "labels": [],
       "body": "This is a prospective change to remove support for multi-collection of batches from DAP, as this was only required for the Heavy Hitters application which will no longer be supported by DAP.\r\n\r\nSpecifically:\r\n * Remove the `max_batch_query_count` task parameter, replacing uses of this parameter with semantics which are equivalent to a `max_batch_query_count` of 1.\r\n * Remove the fixed-size query type's `by_batch_id` query (as well as the `FixedSizeQueryType` message, since there is now only one possibility).\r\n * Remove the `PartialBatchSelector` from the `Collection` message, since this was used only to convey the `BatchId` to the `Collector` for later use of the `by_batch_id` query type, which is now gone. (With this change, Collectors no longer need to be aware of the concept of batch IDs.)\r\n\r\nCloses #259.\r\nCloses #316.\r\nCloses #405.\r\nCloses #409.\r\nCloses #436.",
       "createdAt": "2024-04-23T23:03:03Z",
-      "updatedAt": "2024-05-14T23:48:53Z",
+      "updatedAt": "2024-05-21T20:58:52Z",
       "baseRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
       "baseRefName": "main",
       "baseRefOid": "919fe97674dae0be68b52f40892883aafc5d77bf",
       "headRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
       "headRefName": "bran/remove-multi-collection",
       "headRefOid": "25fb1cb293186fb28e37652e5b8a05d7cf049ddb",
-      "closedAt": null,
-      "mergedAt": null,
-      "mergedBy": null,
-      "mergeCommit": null,
+      "closedAt": "2024-05-21T20:58:52Z",
+      "mergedAt": "2024-05-21T20:58:52Z",
+      "mergedBy": "branlwyd",
+      "mergeCommit": {
+        "oid": "1d80bf9eadafe47f38391809c1f02d2611c8ad45"
+      },
       "comments": [
         {
           "author": "cjpatton",
@@ -66443,6 +66453,48 @@
           "body": "",
           "createdAt": "2024-05-07T14:10:20Z",
           "updatedAt": "2024-05-07T14:10:20Z",
+          "comments": []
+        }
+      ]
+    },
+    {
+      "number": 562,
+      "id": "PR_kwDOFEJYQs5wILRS",
+      "title": "Update changelog & version tags for DAP-11.",
+      "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/pull/562",
+      "state": "MERGED",
+      "author": "branlwyd",
+      "authorAssociation": "COLLABORATOR",
+      "assignees": [],
+      "labels": [],
+      "body": "",
+      "createdAt": "2024-05-21T21:10:28Z",
+      "updatedAt": "2024-05-21T22:23:55Z",
+      "baseRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
+      "baseRefName": "main",
+      "baseRefOid": "1d80bf9eadafe47f38391809c1f02d2611c8ad45",
+      "headRepository": "ietf-wg-ppm/draft-ietf-ppm-dap",
+      "headRefName": "bran/changelog",
+      "headRefOid": "eb64f280913ee10fc302b1de8723b388cb38f023",
+      "closedAt": "2024-05-21T22:23:54Z",
+      "mergedAt": "2024-05-21T22:23:54Z",
+      "mergedBy": "branlwyd",
+      "mergeCommit": {
+        "oid": "35f1274853c1c06a5132612b111debefe4fd17ac"
+      },
+      "comments": [],
+      "reviews": [
+        {
+          "id": "PRR_kwDOFEJYQs57XRjX",
+          "commit": {
+            "abbreviatedOid": "eb64f28"
+          },
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "state": "APPROVED",
+          "body": "",
+          "createdAt": "2024-05-21T21:57:07Z",
+          "updatedAt": "2024-05-21T21:57:07Z",
           "comments": []
         }
       ]
