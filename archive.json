@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-06-04T00:59:34.273476+00:00",
+  "timestamp": "2024-06-06T00:59:04.430689+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -2657,10 +2657,12 @@
       "author": "ekr",
       "authorAssociation": "COLLABORATOR",
       "assignees": [],
-      "labels": [],
+      "labels": [
+        "editorial"
+      ],
       "body": ".(E.g., `<23..479>` instead of `<1..2^16-1>`.)]",
       "createdAt": "2021-08-13T21:52:11Z",
-      "updatedAt": "2023-11-09T10:19:37Z",
+      "updatedAt": "2024-06-05T17:05:03Z",
       "closedAt": null,
       "comments": []
     },
@@ -9295,15 +9297,15 @@
       "id": "I_kwDOFEJYQs5krfYq",
       "title": "Handling missing state",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/455",
-      "state": "OPEN",
+      "state": "CLOSED",
       "author": "ekr",
       "authorAssociation": "COLLABORATOR",
       "assignees": [],
       "labels": [],
       "body": "> 1. Finally, if an Aggregator cannot determine if an input share is valid, it\r\n   MUST mark the input share as invalid with error `report_dropped`. For\r\n   example, if the Aggregator has evicted the state required to perform the\r\n   check from long-term storage. (See {{reducing-storage-requirements}} for\r\n   details.)\r\n\r\nIs this aggressive enough? I think we need to be careful that state exhaustion\r\ncan't be used to enable differencing attacks where only some inputs are removed.\r\nNeed to think more about this.",
       "createdAt": "2023-04-28T20:54:42Z",
-      "updatedAt": "2023-10-24T21:04:23Z",
-      "closedAt": null,
+      "updatedAt": "2024-06-05T17:06:19Z",
+      "closedAt": "2024-06-05T17:06:19Z",
       "comments": [
         {
           "author": "cjpatton",
@@ -9311,6 +9313,13 @@
           "body": "What do you mean by \"differencing attacks\"?\r\n\r\nOne condition this text envisions is tracking report IDs for replay protection. We don't want to require Aggregators to keep this state forever; they should be allowed to drop report IDs for old reports, say, older than a week. Suppose an Aggregator just that. Then if it receives a report older than a week, it can't determine whether the report is replayed. Instead, it should reject the report to be on the safe side.",
           "createdAt": "2023-10-24T21:04:22Z",
           "updatedAt": "2023-10-24T21:04:22Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "I don't think there's anything to do here.",
+          "createdAt": "2024-06-05T17:06:19Z",
+          "updatedAt": "2024-06-05T17:06:19Z"
         }
       ]
     },
@@ -9563,12 +9572,11 @@
         "chris-wood"
       ],
       "labels": [
-        "editorial",
-        "ietf118"
+        "editorial"
       ],
       "body": "In #393, we define a union with an enum discriminant roughly like:\r\n\r\n```\r\nenum {\r\n  continue(0),\r\n  finished(1)\r\n  reject(2),\r\n  (255)\r\n} PrepareStepState;\r\n\r\nstruct {\r\n  PrepareStepState prepare_step_state;\r\n  select (PrepareStep.prepare_step_state) {\r\n    case continue:\r\n      ReportId report_id;\r\n      opaque payload<0..2^32-1>;\r\n    case finished:\r\n      ReportId report_id;\r\n    case reject:\r\n      ReportId report_id;\r\n      ReportShareError report_share_error;\r\n  };\r\n} PrepareStep;\r\n```\r\n\r\nThen later in protocol text, we define partial constructions of values like:\r\n\r\n```\r\nstruct {\r\n  PrepareStepState prepare_step_state = 2; /* reject */\r\n  ReportId report_id;\r\n  ReportShareError report_share_error;\r\n} PrepareStep;\r\n```\r\n\r\nThis notation is clear and certainly is more compact than a paragraph explaining to implementers what enum variant to use, but it conflicts with [section 3.7 of RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446#section-3.7), which tells us that this is the notation for defining structs that contain fields whose values are fixed (I gather this was useful in TLS 1.3 for backward compatibility with older TLS versions).\r\n\r\nWe can resolve this by adding some text to \"Conventions and Definitions\", where we introduce the usage of RFC 8446 presentation language, explaining our extensions and deviations. There may also be some prior art in other TLS WG documents we can reference, but I haven't found it.",
       "createdAt": "2023-06-14T18:22:32Z",
-      "updatedAt": "2024-05-09T18:06:42Z",
+      "updatedAt": "2024-06-04T15:56:11Z",
       "closedAt": null,
       "comments": [
         {
@@ -9741,11 +9749,11 @@
       "authorAssociation": "COLLABORATOR",
       "assignees": [],
       "labels": [
-        "ietf118"
+        "feature"
       ],
       "body": "## Problem statement\r\n\r\nIssue #183 discusses the tradeoff between the anti-replay requirements in the collect sub-protocol and flexibility. In particular, ekr articulates a desire to enable cross tabulation and drilling down.\r\n\r\nAt a high level, the idea is that if you're measuring some metric across a population -- let's say it's the number of milliseconds it takes to perform some operation -- you might also wish to narrow that query to a subset of members based on what region of the world they are in.\r\n\r\nThe best thing you can do in DAP today is to create one task for each region your users are in. So you'd have tasks for `operation_latency_germany`, `operation_latency_turkey`, and so on. This solution isn't a complete dead end, but is unsatisfactory:\r\n\r\n- It forces you to commit to a strategy for constructing tasks ahead of gathering data.\r\n- Changing that strategy is hard (as it involves updating all the clients and then you have to figure out how to reconcile the data you get from clients on the new strategy with the long tail of clients on the old strategy).\r\n- Some of the tasks you create may end up with too few reports to be aggregatable. Maybe you can query over bigger and bigger time intervals to satisfy the minimum batch size, but then doing analysis across tasks can be challenging: for highly populated regions, you might have data with hourly granularity, but only monthly in others.\r\n\r\nIssue #183 is about that problem statement. In this issue, I want to sketch out one solution to that problem so we can explore its tradeoffs.\r\n\r\n## Solution outline\r\n\r\nDAP task parameters can optionally include a set of _labels_ that can be applied to each report uploaded in the task. Each label is a key-value pair. The keys are integers[^1][^2]. The values can be either strings or integers[^3]. The type of each label's values is also part of the task parameters.\r\n\r\nWhen uploading a report, Clients MAY include one or more of the labels[^4]. We extend [`struct ReportMetadata`](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-05#name-upload-request):\r\n\r\n```\r\nuint32 LabelKey;\r\n\r\nenum {\r\n  string(0),\r\n  integer(1),\r\n  <possibly more types>\r\n  (255)\r\n} LabelType;\r\n\r\nstruct {\r\n  LabelKey key;\r\n  LabelType label_type;\r\n  select (Label.label_type) {\r\n      string: opaque value<1..2^32-1>;\r\n      integer: int32 value;\r\n  }\r\n} Label;\r\n\r\nstruct {\r\n  ReportID report_id;\r\n  Time time;\r\n  Label labels<0..2^8-1>;\r\n} ReportMetadata;\r\n```\r\n\r\nAggregators then store the labels with the report shares. Then, when Collectors make queries, they can provide zero or more labels and values which instructs the Aggregators to only aggregate over the reports whose labels match every label enumerated in the query[^5]. We extend [`struct Query`](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-05#name-queries):\r\n\r\n```\r\nstruct {\r\n  QueryType query_type;\r\n  select (Query.query_type) {\r\n    case time_interval: Interval batch_interval;\r\n    case fixed_size: FixedSizeQuery fixed_size_query;\r\n  }\r\n  Label labels<0..2^8-1>;\r\n} Query;\r\n```\r\n\r\n### Batch validation\r\n\r\nA batch is now defined by both the existing query (i.e., the time interval or the batch ID for fixed case) and the labels specified by the collector. Otherwise, batch validation works as before:\r\n\r\n- Batches must meet the task's minimum batch size. If there are not enough reports with the label set requested by the collector, the collection job fails.\r\n- The task's max query count applies.\r\n- Batches may not overlap. If one query over time interval _t_ sets `country = Kenya`, and the next sets `color = blue`, then if any reports had `color = blue && country = Kenya`, the second query fails[^6].\r\n\r\n## Troubling implications\r\n\r\n### Label values are fingerprints\r\n\r\nThe whole point of DAP is to allow aggregation over sensitive values without revealing individual contributions, but the labels applied to reports may themselves be privacy sensitive. In particular, tasks may define so many labels that they allow high precision fingerprinting of clients by Aggregators, though at least Collectors wouldn't see the labels on individual reports.\r\n\r\nLabels and their values are opaque to DAP, so we could punt the problem to deployments and write a security consideration that labels should be chosen carefully. But maybe there's a clever cryptographic solution here? Could the label evaluation be done in MPC, or would that add more rounds to the protocol?\r\n\r\n### Breaks eager aggregation\r\n\r\nIn VDAFs that don't have aggregation parameters like the Prio3 family, Aggregators can eagerly aggregate reports ahead of any request from the Collector. This is no longer possible in the presence of labels because the Aggregators can't anticipate what labels the Collectors will query on (and if this were possible, then the Collector should have used distinct tasks in the first place and we wouldn't need labels at all).\r\n\r\nI suspect we can live with this problem, especially since deployments can opt out of labels and thus re-enable eager aggregation.\r\n\r\n### Queries in wrong order can lock Collector out of data\r\n\r\nWe started with the problem statement of enabling drill-down, which is to say, aggregating over a whole population, and then doing another query over a subset of the population. However due to collection anti-replay requirements this isn't possible: the query over the entire task would consume the `max_batch_query_count` for every report, and the subsequent query for some label value would fail.\r\n\r\nInstead, Collectors would have to make queries over the most specific combinations of labels and then combine those query results outside of DAP. For example, take `Prio3Count` over each of `country = [Kenya, Turkey, Germany]`, and then sum each of those together to get the count over the entire population.\r\n\r\nTo do better here, we'd have to relax the batch validation requirements. @simon-friedberger suggested that drill-down could be OK so long as the more specific queries yield disjoint sets, each of which is large enough to meet the task's minimum batch size. \r\n\r\nFor example, suppose we have a task with minimum batch size 100 and a single label that has 10 possible values. Further we have a time interval with 10,000 reports in it, and each value of the label has 1,000 values. Is it acceptable w.r.t. to allow one aggregation over the 10,000 reports, and then 10 more aggregations over each of the 10 label values?\r\n\r\nNow let's suppose the task has another label, each of which has 10 possible values, and that there are 100 reports with each combination of label values. Would 100 more aggregations over each of those combinations be acceptable?\r\n\r\n[^1]: What integer width should we use for the keys?\r\n[^2]: We could also make the keys strings, but nobody except the collector needs to know what the labels semantically actually are. A mapping of label key to some description can be maintained in the collector, and it's more efficient to encode an integer into reports than arbitrary length strings.\r\n[^3]: Do we need label value types besides these? Floating point numbers?\r\n[^4]: Should all the labels defined in a task be mandatory?\r\n[^5]: As written this implies that queries can only test for value equality, but we could design a richer query language that lets you do things like test string prefixes, suffixes, substrings, do integer comparisons, or do negations. I'm wary of taking on the design challenge of designing a sufficiently rich query language, but there is lots of prior art, such as [Apple's `NSPredicate`](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Predicates/AdditionalChapters/Introduction.html#//apple_ref/doc/uid/TP40001789).\r\n[^6]: This makes a strong case for including negations in the query language, so that the Collector's second query could express `color = blue && country != Kenya`.",
       "createdAt": "2023-07-28T23:05:21Z",
-      "updatedAt": "2023-11-07T13:28:45Z",
+      "updatedAt": "2024-06-05T16:33:11Z",
       "closedAt": null,
       "comments": [
         {
@@ -9845,6 +9853,27 @@
           "body": "At IETF 118 we decided to close this issue without changes. Our conclusion was that it should be possible to implement @tgeoghegan's proposal as a report extension.",
           "createdAt": "2023-11-07T13:28:45Z",
           "updatedAt": "2023-11-07T13:28:45Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Hey everyone, this thread has been stewing for a while, and given that we're close to finishing DAP, I want to see if there's consensus to close it. A couple of observations:\r\n\r\nFirst, I believe this functionality can be specified as a DAP extension. In particular, the teport extension could  be used to assign reports to attribute classes for grouping them during aggregation or collection. We may need an extension point for collection in order to express what attributes the collector wants to collect by. Is there interest in specifying this?\r\n\r\nSecond, partitioning reports by client attributes _in the clear_ invariably reduces the anonymity set. (In general there may be fewer clients with a particular attribute than the minimum batch size.) A new VDAF called [Mastic](https://eprint.iacr.org/2024/221) allows grouping aggregates by client attributes _without reducing the anonymity set_.\r\n\r\nThe functionality you get from Mastic is somewhat restricted, in particular it doesn't support all of the \"drill down\" queries discussed on this thread. It also has higher communication cost than you'd have with Prio3 + plaintext attributes.\r\n\r\nAn implementation of Mastic and corresponding I-D are in progress:\r\n1. https://github.com/divviup/libprio-rs/issues/947\r\n2. https://github.com/jimouris/draft-mouris-cfrg-mastic ",
+          "createdAt": "2024-06-04T15:55:51Z",
+          "updatedAt": "2024-06-04T15:55:51Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "The fact that Mastic was able to do something useful with attributes without DAP layer changes proves (or at least suggests) to me that we don't need to do anything here.\r\n\r\nI think the remaining use case we're speculating about is Prio3 with labels, but what if instead of making DAP layer changes for that, we imagine a Prio3WithLabels VDAF, in which (shooting from the hip here) the public share was the encoded labels and the aggregation parameter was the labels the collector is interested in? Basically my intuition is that if Mastic made this work, we should be able to imagine a Prio3 variant that can make it work, and one again not need DAP changes.",
+          "createdAt": "2024-06-05T15:49:40Z",
+          "updatedAt": "2024-06-05T15:49:40Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "\r\n> I think the remaining use case we're speculating about is Prio3 with labels, but what if instead of making DAP layer changes for that, we imagine a Prio3WithLabels VDAF, in which (shooting from the hip here) the public share was the encoded labels and the aggregation parameter was the labels the collector is interested in?\r\n\r\nNice observation, I think that would work just fine.\r\n",
+          "createdAt": "2024-06-05T16:33:10Z",
+          "updatedAt": "2024-06-05T16:33:10Z"
         }
       ]
     },
@@ -10382,10 +10411,12 @@
       "author": "suman-ganta",
       "authorAssociation": "NONE",
       "assignees": [],
-      "labels": [],
+      "labels": [
+        "feature"
+      ],
       "body": "PPM prescribed media types do not have version component in them. As DAP protocol progressing, the structures are changing in a non-compatible way. In order to consistently decode those structures, we need an indicator on what structure to use to decode them with.\r\n\r\nI propose adding a MIME parameter, `version`, to express the version of the payload.\r\n\r\nEx: To represent Report structure of protocol version DAP-09, use the media type - `application/dap-report;version=09`\r\n\r\nLeader/Helper need to rely on this MIME parameter to consistently parse the payload received, and should also be used to reject unsupported versions.\r\n\r\n",
       "createdAt": "2024-01-08T16:24:21Z",
-      "updatedAt": "2024-01-16T17:23:41Z",
+      "updatedAt": "2024-06-05T17:04:19Z",
       "closedAt": null,
       "comments": [
         {
@@ -10619,10 +10650,12 @@
       "author": "branlwyd",
       "authorAssociation": "COLLABORATOR",
       "assignees": [],
-      "labels": [],
+      "labels": [
+        "feature"
+      ],
       "body": "Once multi-collection of batches has been removed, we should consider whether the `max_batch_size` parameter of the fixed-size query type might be removed.\r\n\r\nSee https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/pull/554/files#r1577003240 for context; in short, `max_batch_size`'s strongest use-case is in the case of a multiply-collected VDAF. It is unclear if there is a strong justification for this parameter in a DAP which supports only singly-collected VDAFs.",
       "createdAt": "2024-04-24T22:22:28Z",
-      "updatedAt": "2024-05-01T19:45:14Z",
+      "updatedAt": "2024-06-05T17:03:52Z",
       "closedAt": null,
       "comments": [
         {
@@ -10652,6 +10685,13 @@
           "body": "Ah, thanks for clarifying! FWIW, taskprov interprets unspecified max_batch_size as unlimited: https://datatracker.ietf.org/doc/html/draft-wang-ppm-dap-taskprov-06#section-3-9",
           "createdAt": "2024-05-01T19:45:13Z",
           "updatedAt": "2024-05-01T19:45:13Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "One more thought here, after working out some bottlenecks in our DAP service: in fact, the maximum batch size is important for capacity planning. In order to implement replay protection, existing DAP implementations generally do [some form of sharding](https://docs.google.com/document/d/1MkYMFlW0UGSP_-tyQyF4qrrbp84240Kbjx4WSmHBW6g/edit#heading=h.e6kyob2ixvk3) of stored report IDs in order to mitigate the cost of checking an ID already exists. Your sharding scheme, and the number of shards, depends on the maximum batch size you expect.\r\n\r\nBased on this experience, I would actually advocate for the opposite out come: **make the maximum batch size a parameter of every task.** I would probably also rename fixed size to something like \"leader-specified\" that is closer to the semantics of the query type.",
+          "createdAt": "2024-06-05T17:03:42Z",
+          "updatedAt": "2024-06-05T17:03:42Z"
         }
       ]
     },
@@ -10690,10 +10730,12 @@
       "author": "cjpatton",
       "authorAssociation": "COLLABORATOR",
       "assignees": [],
-      "labels": [],
+      "labels": [
+        "feature"
+      ],
       "body": "As mentioned in #556, replay protection implies a relatively stringent operational requirement for the Helper: many aggregation jobs might make concurrent transactions on the same database, which can easily overwhelm the database if not sufficiently provisioned.\r\n\r\nTo mitigate this problem, the Helper can cancel an aggregation job and ask the Leader to try again later. One option is to respond with HTTP status 429 and a \"retry-after\" header indicating when it should be safe to retry.\r\n\r\nI'd like to suggest that we spell this out explicitly in the draft.",
       "createdAt": "2024-05-01T20:01:38Z",
-      "updatedAt": "2024-05-01T21:14:23Z",
+      "updatedAt": "2024-06-04T20:00:51Z",
       "closedAt": null,
       "comments": [
         {
@@ -10709,6 +10751,13 @@
           "body": "For Daphne, it's for jobs sharing a batch \"bucket\":\r\n1. For time-interval tasks, each bucket is a time window\r\n2. For fixed-size queries, there is just one bucket, which is identified by the batch ID.\r\n",
           "createdAt": "2024-05-01T21:14:22Z",
           "updatedAt": "2024-05-01T21:14:22Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Just wanted to quickly document here an alternative mentioned by @divergentdave on a call: allow aggregation jobs to be asynchronous. In response to an aggregation job initialization request, the helper is allowed to respond with 201 Created without producing a response. The leader would then poll the helper to see if the response is ready, similar to how the collector polls the leader on collection jobs.\r\n\r\nThis gets a little complicated for multi-round VDAFs, but I think we can figure this out.\r\n\r\ncc/ @Noah-Kennedy",
+          "createdAt": "2024-06-04T20:00:50Z",
+          "updatedAt": "2024-06-04T20:00:50Z"
         }
       ]
     },
