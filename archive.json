@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-06-06T00:59:04.430689+00:00",
+  "timestamp": "2024-06-09T01:04:57.302655+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -10735,7 +10735,7 @@
       ],
       "body": "As mentioned in #556, replay protection implies a relatively stringent operational requirement for the Helper: many aggregation jobs might make concurrent transactions on the same database, which can easily overwhelm the database if not sufficiently provisioned.\r\n\r\nTo mitigate this problem, the Helper can cancel an aggregation job and ask the Leader to try again later. One option is to respond with HTTP status 429 and a \"retry-after\" header indicating when it should be safe to retry.\r\n\r\nI'd like to suggest that we spell this out explicitly in the draft.",
       "createdAt": "2024-05-01T20:01:38Z",
-      "updatedAt": "2024-06-04T20:00:51Z",
+      "updatedAt": "2024-06-07T00:05:14Z",
       "closedAt": null,
       "comments": [
         {
@@ -10758,6 +10758,34 @@
           "body": "Just wanted to quickly document here an alternative mentioned by @divergentdave on a call: allow aggregation jobs to be asynchronous. In response to an aggregation job initialization request, the helper is allowed to respond with 201 Created without producing a response. The leader would then poll the helper to see if the response is ready, similar to how the collector polls the leader on collection jobs.\r\n\r\nThis gets a little complicated for multi-round VDAFs, but I think we can figure this out.\r\n\r\ncc/ @Noah-Kennedy",
           "createdAt": "2024-06-04T20:00:50Z",
           "updatedAt": "2024-06-04T20:00:50Z"
+        },
+        {
+          "author": "Noah-Kennedy",
+          "authorAssociation": "NONE",
+          "body": "> Just wanted to quickly document here an alternative mentioned by @divergentdave on a call: allow aggregation jobs to be asynchronous. In response to an aggregation job initialization request, the helper is allowed to respond with 201 Created without producing a response. The leader would then poll the helper to see if the response is ready, similar to how the collector polls the leader on collection jobs.\r\n> \r\n> This gets a little complicated for multi-round VDAFs, but I think we can figure this out.\r\n> \r\n> cc/ @Noah-Kennedy\r\n\r\nI quite like this approach, as it gives a lot more flexibility to implementations than the current status quo.\r\n\r\nThis makes scaling up the protocol a lot easier.",
+          "createdAt": "2024-06-06T21:03:36Z",
+          "updatedAt": "2024-06-06T21:03:36Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "This shouldn't take too much protocol text to achieve: we'd need to clarify that it's OK for the helper to respond to `PUT /tasks/{task_id}/aggregation_jobs/{aggregation_job_id}` with 201 Created and then spell out that the leader should then poll `GET /tasks/{task_id}/aggregation_jobs/{aggregation_job_id}` until they get 200 OK and an `AggregationJobResp` (basically the same semantics as for collection jobs).",
+          "createdAt": "2024-06-06T21:48:59Z",
+          "updatedAt": "2024-06-06T21:48:59Z"
+        },
+        {
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "body": "Tim's comment raises a good question: if we take this, should we allow both asynchronous & synchronous aggregation job behavior, or only asynchronous?\r\n\r\nIMO, it would be nice if we could specify only one of asynchronous/synchronous behavior: requiring implementations to support both modes would be added complexity; specifying both modes but allowing implementations to only implement one mode could lead to interoperability problems between aggregator implementations. But maybe that is too hopeful?\r\n\r\n(In general, I think asynchronous aggregation jobs are a good idea since they decouple expensive computation from synchronous HTTP requests. But they do increase the communication cost of each aggregation job -- every aggregation job will now require at least two network round trips, or more precisely two round trips per aggregation step required by the VDAF. I think this means that implementations would want to tune for fewer, larger aggregation jobs to amortize this cost per-report.)",
+          "createdAt": "2024-06-06T23:57:27Z",
+          "updatedAt": "2024-06-06T23:58:40Z"
+        },
+        {
+          "author": "branlwyd",
+          "authorAssociation": "COLLABORATOR",
+          "body": "I do think asynchronous aggregation jobs lead to increased complexity in the \"aggregation job state machine\".\r\n\r\nWith synchronous aggregation jobs, the state machine goes from step 1 -> step 2 ... until the aggregation job is complete.\r\n\r\nWith asynchronous aggregation jobs, an additional \"computing\" step will be added to each step above, so that the state machine goes computing step 1 -> step 1 -> computing step 2 -> step 2 -> ...\r\n\r\nThis is not a fatal flaw, just something to consider when weighing synchronous vs asynchronous behaviors.",
+          "createdAt": "2024-06-07T00:05:13Z",
+          "updatedAt": "2024-06-07T00:05:13Z"
         }
       ]
     },
