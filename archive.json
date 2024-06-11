@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2024-06-09T01:04:57.302655+00:00",
+  "timestamp": "2024-06-11T01:00:22.497828+00:00",
   "repo": "ietf-wg-ppm/draft-ietf-ppm-dap",
   "labels": [
     {
@@ -9744,7 +9744,7 @@
       "id": "I_kwDOFEJYQs5s6LsO",
       "title": "Labeling of reports for drill-down queries",
       "url": "https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/issues/489",
-      "state": "OPEN",
+      "state": "CLOSED",
       "author": "tgeoghegan",
       "authorAssociation": "COLLABORATOR",
       "assignees": [],
@@ -9753,8 +9753,8 @@
       ],
       "body": "## Problem statement\r\n\r\nIssue #183 discusses the tradeoff between the anti-replay requirements in the collect sub-protocol and flexibility. In particular, ekr articulates a desire to enable cross tabulation and drilling down.\r\n\r\nAt a high level, the idea is that if you're measuring some metric across a population -- let's say it's the number of milliseconds it takes to perform some operation -- you might also wish to narrow that query to a subset of members based on what region of the world they are in.\r\n\r\nThe best thing you can do in DAP today is to create one task for each region your users are in. So you'd have tasks for `operation_latency_germany`, `operation_latency_turkey`, and so on. This solution isn't a complete dead end, but is unsatisfactory:\r\n\r\n- It forces you to commit to a strategy for constructing tasks ahead of gathering data.\r\n- Changing that strategy is hard (as it involves updating all the clients and then you have to figure out how to reconcile the data you get from clients on the new strategy with the long tail of clients on the old strategy).\r\n- Some of the tasks you create may end up with too few reports to be aggregatable. Maybe you can query over bigger and bigger time intervals to satisfy the minimum batch size, but then doing analysis across tasks can be challenging: for highly populated regions, you might have data with hourly granularity, but only monthly in others.\r\n\r\nIssue #183 is about that problem statement. In this issue, I want to sketch out one solution to that problem so we can explore its tradeoffs.\r\n\r\n## Solution outline\r\n\r\nDAP task parameters can optionally include a set of _labels_ that can be applied to each report uploaded in the task. Each label is a key-value pair. The keys are integers[^1][^2]. The values can be either strings or integers[^3]. The type of each label's values is also part of the task parameters.\r\n\r\nWhen uploading a report, Clients MAY include one or more of the labels[^4]. We extend [`struct ReportMetadata`](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-05#name-upload-request):\r\n\r\n```\r\nuint32 LabelKey;\r\n\r\nenum {\r\n  string(0),\r\n  integer(1),\r\n  <possibly more types>\r\n  (255)\r\n} LabelType;\r\n\r\nstruct {\r\n  LabelKey key;\r\n  LabelType label_type;\r\n  select (Label.label_type) {\r\n      string: opaque value<1..2^32-1>;\r\n      integer: int32 value;\r\n  }\r\n} Label;\r\n\r\nstruct {\r\n  ReportID report_id;\r\n  Time time;\r\n  Label labels<0..2^8-1>;\r\n} ReportMetadata;\r\n```\r\n\r\nAggregators then store the labels with the report shares. Then, when Collectors make queries, they can provide zero or more labels and values which instructs the Aggregators to only aggregate over the reports whose labels match every label enumerated in the query[^5]. We extend [`struct Query`](https://datatracker.ietf.org/doc/html/draft-ietf-ppm-dap-05#name-queries):\r\n\r\n```\r\nstruct {\r\n  QueryType query_type;\r\n  select (Query.query_type) {\r\n    case time_interval: Interval batch_interval;\r\n    case fixed_size: FixedSizeQuery fixed_size_query;\r\n  }\r\n  Label labels<0..2^8-1>;\r\n} Query;\r\n```\r\n\r\n### Batch validation\r\n\r\nA batch is now defined by both the existing query (i.e., the time interval or the batch ID for fixed case) and the labels specified by the collector. Otherwise, batch validation works as before:\r\n\r\n- Batches must meet the task's minimum batch size. If there are not enough reports with the label set requested by the collector, the collection job fails.\r\n- The task's max query count applies.\r\n- Batches may not overlap. If one query over time interval _t_ sets `country = Kenya`, and the next sets `color = blue`, then if any reports had `color = blue && country = Kenya`, the second query fails[^6].\r\n\r\n## Troubling implications\r\n\r\n### Label values are fingerprints\r\n\r\nThe whole point of DAP is to allow aggregation over sensitive values without revealing individual contributions, but the labels applied to reports may themselves be privacy sensitive. In particular, tasks may define so many labels that they allow high precision fingerprinting of clients by Aggregators, though at least Collectors wouldn't see the labels on individual reports.\r\n\r\nLabels and their values are opaque to DAP, so we could punt the problem to deployments and write a security consideration that labels should be chosen carefully. But maybe there's a clever cryptographic solution here? Could the label evaluation be done in MPC, or would that add more rounds to the protocol?\r\n\r\n### Breaks eager aggregation\r\n\r\nIn VDAFs that don't have aggregation parameters like the Prio3 family, Aggregators can eagerly aggregate reports ahead of any request from the Collector. This is no longer possible in the presence of labels because the Aggregators can't anticipate what labels the Collectors will query on (and if this were possible, then the Collector should have used distinct tasks in the first place and we wouldn't need labels at all).\r\n\r\nI suspect we can live with this problem, especially since deployments can opt out of labels and thus re-enable eager aggregation.\r\n\r\n### Queries in wrong order can lock Collector out of data\r\n\r\nWe started with the problem statement of enabling drill-down, which is to say, aggregating over a whole population, and then doing another query over a subset of the population. However due to collection anti-replay requirements this isn't possible: the query over the entire task would consume the `max_batch_query_count` for every report, and the subsequent query for some label value would fail.\r\n\r\nInstead, Collectors would have to make queries over the most specific combinations of labels and then combine those query results outside of DAP. For example, take `Prio3Count` over each of `country = [Kenya, Turkey, Germany]`, and then sum each of those together to get the count over the entire population.\r\n\r\nTo do better here, we'd have to relax the batch validation requirements. @simon-friedberger suggested that drill-down could be OK so long as the more specific queries yield disjoint sets, each of which is large enough to meet the task's minimum batch size. \r\n\r\nFor example, suppose we have a task with minimum batch size 100 and a single label that has 10 possible values. Further we have a time interval with 10,000 reports in it, and each value of the label has 1,000 values. Is it acceptable w.r.t. to allow one aggregation over the 10,000 reports, and then 10 more aggregations over each of the 10 label values?\r\n\r\nNow let's suppose the task has another label, each of which has 10 possible values, and that there are 100 reports with each combination of label values. Would 100 more aggregations over each of those combinations be acceptable?\r\n\r\n[^1]: What integer width should we use for the keys?\r\n[^2]: We could also make the keys strings, but nobody except the collector needs to know what the labels semantically actually are. A mapping of label key to some description can be maintained in the collector, and it's more efficient to encode an integer into reports than arbitrary length strings.\r\n[^3]: Do we need label value types besides these? Floating point numbers?\r\n[^4]: Should all the labels defined in a task be mandatory?\r\n[^5]: As written this implies that queries can only test for value equality, but we could design a richer query language that lets you do things like test string prefixes, suffixes, substrings, do integer comparisons, or do negations. I'm wary of taking on the design challenge of designing a sufficiently rich query language, but there is lots of prior art, such as [Apple's `NSPredicate`](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Predicates/AdditionalChapters/Introduction.html#//apple_ref/doc/uid/TP40001789).\r\n[^6]: This makes a strong case for including negations in the query language, so that the Collector's second query could express `color = blue && country != Kenya`.",
       "createdAt": "2023-07-28T23:05:21Z",
-      "updatedAt": "2024-06-05T16:33:11Z",
-      "closedAt": null,
+      "updatedAt": "2024-06-10T21:15:44Z",
+      "closedAt": "2024-06-10T21:15:44Z",
       "comments": [
         {
           "author": "simon-friedberger",
@@ -9874,6 +9874,13 @@
           "body": "\r\n> I think the remaining use case we're speculating about is Prio3 with labels, but what if instead of making DAP layer changes for that, we imagine a Prio3WithLabels VDAF, in which (shooting from the hip here) the public share was the encoded labels and the aggregation parameter was the labels the collector is interested in?\r\n\r\nNice observation, I think that would work just fine.\r\n",
           "createdAt": "2024-06-05T16:33:10Z",
           "updatedAt": "2024-06-05T16:33:10Z"
+        },
+        {
+          "author": "cjpatton",
+          "authorAssociation": "COLLABORATOR",
+          "body": "[I brought this to the list for discussion, and it doesn't seem like there's appetite to modify DAP to support this feature.]( https://mailarchive.ietf.org/arch/msg/ppm/MVyU7ZsdQ3rfVx3dtvZ8nnFVoo4/) If you'd like to consider specifying this functionality as a DAP extension and think there needs to be a protocol change, please feel free to re-open. ",
+          "createdAt": "2024-06-10T21:15:44Z",
+          "updatedAt": "2024-06-10T21:15:44Z"
         }
       ]
     },
@@ -10655,7 +10662,7 @@
       ],
       "body": "Once multi-collection of batches has been removed, we should consider whether the `max_batch_size` parameter of the fixed-size query type might be removed.\r\n\r\nSee https://github.com/ietf-wg-ppm/draft-ietf-ppm-dap/pull/554/files#r1577003240 for context; in short, `max_batch_size`'s strongest use-case is in the case of a multiply-collected VDAF. It is unclear if there is a strong justification for this parameter in a DAP which supports only singly-collected VDAFs.",
       "createdAt": "2024-04-24T22:22:28Z",
-      "updatedAt": "2024-06-05T17:03:52Z",
+      "updatedAt": "2024-06-10T22:55:48Z",
       "closedAt": null,
       "comments": [
         {
@@ -10692,6 +10699,20 @@
           "body": "One more thought here, after working out some bottlenecks in our DAP service: in fact, the maximum batch size is important for capacity planning. In order to implement replay protection, existing DAP implementations generally do [some form of sharding](https://docs.google.com/document/d/1MkYMFlW0UGSP_-tyQyF4qrrbp84240Kbjx4WSmHBW6g/edit#heading=h.e6kyob2ixvk3) of stored report IDs in order to mitigate the cost of checking an ID already exists. Your sharding scheme, and the number of shards, depends on the maximum batch size you expect.\r\n\r\nBased on this experience, I would actually advocate for the opposite out come: **make the maximum batch size a parameter of every task.** I would probably also rename fixed size to something like \"leader-specified\" that is closer to the semantics of the query type.",
           "createdAt": "2024-06-05T17:03:42Z",
           "updatedAt": "2024-06-05T17:03:42Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "I think there's a problem with requiring a maximum batch size for time interval. Suppose the collector request a time interval where there are `max_batch_size + min_batch_size` reports available for aggregation. Two problems present themselves:\r\n\r\n1 - Only `max_batch_size` of the reports may be aggregated. How do the leader and helper choose which reports get included in the batch and which don't? What if they disagree? (recall that unlike in the fixed size case, the leader and helper independently decide batch membership in time interval)\r\n2 - Subsequently, what happens to the remaining `min_batch_size` reports? The time interval is now collected, so there's no way for the collector to request an aggregation over them.\r\n\r\nSolving either problem would require more DAP changes than just making `max_batch_size` unconditionally required.\r\n\r\nCan you provide more detail on why batch size matters to your sharding strategy? Specifically, would a bound on aggregation job size rather than batch size solve your problem?",
+          "createdAt": "2024-06-10T22:46:25Z",
+          "updatedAt": "2024-06-10T22:50:47Z"
+        },
+        {
+          "author": "tgeoghegan",
+          "authorAssociation": "COLLABORATOR",
+          "body": "A solution to (1) would be to make time interval work more like fixed size in the specific respect of making the leader responsible for assigning reports to batches. This would have an additional benefit of letting the helper treat every task as fixed-size.\r\n\r\nSolving (2) seems tricky. I think you'd need to introduce something like the `current_batch`/batch ID semantics of fixed size, but compartmentalized by time interval. i.e., the collector would have to make queries not just for some interval of time, but a tuple of an interval and a batch ID (which could be `current_batch`). So then the collector could query on `([t1, t2), current_batch)` until it gets told there are fewer than `min_batch_size` reports left in `[t1, t2)`, and it could refer to each collection of that time interval by its batch ID.",
+          "createdAt": "2024-06-10T22:55:47Z",
+          "updatedAt": "2024-06-10T22:55:47Z"
         }
       ]
     },
