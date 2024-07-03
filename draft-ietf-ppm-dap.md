@@ -1389,8 +1389,8 @@ After receiving HTTP status 201 Created, the Leader proceeds to poll the
 aggregation job by sending requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` until
 receiving HTTP status 200 OK with a body containing an `AggregationJobResp`.
-The response MAY include a Retry-After header field to suggest a polling
-interval to the Leader.
+The Helper's response MAY include a Retry-After header field to suggest a
+polling interval to the Leader.
 
 The Helper's response will be an `AggregationJobResp` message (see
 {{aggregation-helper-init}}. The response's `prepare_resps` must include exactly
@@ -1570,8 +1570,8 @@ on the status of the aggregation job. If the aggregation job is ready, the
 Helper responds with HTTP status 200 OK and a body consisting of an
 `AggregationJobResp`, with media type "application/dap-aggregation-job-resp".
 If the aggregation job is not finished yet, the Helper responds with HTTP
-status 202 Accepted. The response MAY include a Retry-After header field to
-suggest a polling interval to the Leader.
+status 202 Accepted. The Helper's response MAY include a Retry-After header
+field to suggest a polling interval to the Leader.
 
 Changing an aggregation job's parameters is illegal, so further requests to
 `PUT /tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` for the same
@@ -1742,10 +1742,10 @@ After receiving HTTP status 202 Accepted, the Leader proceeds to poll the
 aggregation job by sending requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` until
 receiving HTTP status 200 OK with a body containing an `AggregationJobResp`.
-The response MAY include a Retry-After header field to suggest a polling
-interval to the Leader.
+The Helper's response MAY include a Retry-After header field to suggest a
+polling interval to the Leader.
 
-The response's `prepare_resps` must include exactly the same report IDs in the
+The response's `prepare_resps` MUST include exactly the same report IDs in the
 same order as the Leader's `AggregationJobContinueReq`. Otherwise, the Leader
 MUST abort the aggregation job.
 
@@ -1804,19 +1804,19 @@ Next, the Helper checks that:
 
 If any of these checks fail, then the Helper MUST abort with error
 `invalidMessage`. Additionally, if any prep step appears out of order relative
-to the previous request, then the Helper MAY abort with error `invalidMessage`.
-(Note that a report may be missing, in which case the Helper should assume the
-Leader rejected it.)
+to the previous request, then the Helper MUST abort with error
+`invalidMessage`. (Note that a report may be missing, in which case the Helper
+should assume the Leader rejected it.)
 
 Next, the Helper checks if the continuation step indicated by the request is
 correct. (For the first `AggregationJobContinueReq` the value should be `1`;
 for the second the value should be `2`; and so on.) If the Leader is one step
 behind (e.g., the Leader has resent the previous HTTP request), then the Helper
-MAY attempt to recover by sending HTTP 202 status Accepted. In this case it
-SHOULD verify that the contents of the `AggregationJobContinueReq` are
-identical to the previous message (see {{aggregation-step-skew-recovery}}).
-Otherwise, if the step is incorrect, the Helper MUST abort with error
-`stepMismatch`.
+MAY attempt to recover by sending HTTP 202 status Accepted and discontinuing
+any further work. In this case it SHOULD verify that the contents of the
+`AggregationJobContinueReq` are identical to the previous message (see
+{{aggregation-step-skew-recovery}}). Otherwise, if the step is incorrect, the
+Helper MUST abort with error `stepMismatch`.
 
 If the Helper finds the `AggregationJobContinueReq` to be valid, it immediately
 responds with HTTP status 202 Accepted. The Helper is now ready to continue
@@ -1865,8 +1865,8 @@ After receiving the response to its `AggregationJobContinueReq`, the Leader
 makes requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` to check on
 the status of the aggregation job. If the continuation is not finished yet,
-the Helper responds with HTTP status 202 Accepted. The response MAY include a
-Retry-After header field to suggest a polling interval to the Leader.
+the Helper responds with HTTP status 202 Accepted. The Helper's response MAY
+include a Retry-After header field to suggest a polling interval to the Leader.
 
 If the aggregation job is ready, the Helper constructs an `AggregationJobResp`
 message ({{aggregation-helper-init}}) with each prep step. The order of the
@@ -1894,9 +1894,9 @@ scenario where the Helper successfully advances from step `n` to `n+1`, but its
 `AggregationJobResp` response to the Leader gets dropped due to something like a
 transient network failure. The Leader could then resend the request to have the
 Helper advance to step `n+1` and the Helper should be able to retransmit the
-`AggregationJobContinueReq` that was previously dropped. To make that kind of
-recovery possible, Aggregator implementations SHOULD checkpoint the most recent
-step's prep state and messages to durable storage such that the Leader can
+`AggregationJobResp` that was previously dropped. To make that kind of recovery
+possible, Aggregator implementations SHOULD checkpoint the most recent step's
+prep state and messages to durable storage such that the Leader can
 re-construct continuation requests and the Helper can re-construct continuation
 responses as needed.
 
