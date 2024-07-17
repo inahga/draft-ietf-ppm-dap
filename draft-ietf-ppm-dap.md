@@ -1389,7 +1389,7 @@ After receiving HTTP status 201 Created, the Leader proceeds to poll the
 aggregation job by sending requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` until
 receiving HTTP status 200 OK with a body containing an `AggregationJobResp`.
-The Helper's response MAY include a Retry-After header field to suggest a
+The Helper's response SHOULD include a Retry-After header field to suggest a
 polling interval to the Leader.
 
 The Helper's response will be an `AggregationJobResp` message (see
@@ -1451,11 +1451,11 @@ initialization messages have the same report ID, then the Helper MUST abort with
 error `invalidMessage`.
 
 If the Helper finds the `AggregationJobInitReq` to be valid, it immediately
-responds with HTTP status 201 Created. The Helper is now ready to process each
-report share into an outbound prepare step, asynchronously from any further
-requests from the leader.
+responds with HTTP status 201 Created. The Helper is now ready to process
+the aggregation job, asynchronously from any further requests from the leader.
 
-The following structures are computed:
+To process the aggregation job, the Helper computes an outbound prepare step
+for each report share. This includes the following structures:
 
 ~~~
 enum {
@@ -1566,17 +1566,23 @@ The order MUST match `AggregationJobInitReq.prepare_inits`.
 After receiving the response to its `AggregationJobInitReq`, the Leader makes
 requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` to check
-on the status of the aggregation job. If the aggregation job is ready, the
-Helper responds with HTTP status 200 OK and a body consisting of an
-`AggregationJobResp`, with media type "application/dap-aggregation-job-resp".
-If the aggregation job is not finished yet, the Helper responds with HTTP
-status 202 Accepted. The Helper's response MAY include a Retry-After header
-field to suggest a polling interval to the Leader.
+on the status of the aggregation job. If the aggregation job is not finished
+yet, the Helper MAY wait for the job to complete. Once the aggregation job is
+ready, or if it is already ready, the Helper responds with HTTP status 200 OK
+and a body consisting of an `AggregationJobResp`, with media type
+"application/dap-aggregation-job-resp".
+
+If the aggregation job is not finished yet, and the Helper chooses not to wait
+for the job to finish, the Helper responds with HTTP status 202 Accepted. The
+Helper's response SHOULD include a Retry-After header field to suggest a
+polling interval to the Leader.
 
 Changing an aggregation job's parameters is illegal, so further requests to
 `PUT /tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` for the same
 `aggregation-job-id` but with a different `AggregationJobInitReq` in the body
-MUST fail with an HTTP client error status code.
+MUST fail with an HTTP client error status code. For further requests with the
+same `AggregationJobInitReq` in the body, the helper MUST respond with HTTP
+status 201 Created.
 
 Additionally, it is not possible to rewind or reset the state of an aggregation
 job. Once an aggregation job has been continued at least once (see
@@ -1742,14 +1748,12 @@ After receiving HTTP status 202 Accepted, the Leader proceeds to poll the
 aggregation job by sending requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` until
 receiving HTTP status 200 OK with a body containing an `AggregationJobResp`.
-The Helper's response MAY include a Retry-After header field to suggest a
+The Helper's response SHOULD include a Retry-After header field to suggest a
 polling interval to the Leader.
 
 The response's `prepare_resps` MUST include exactly the same report IDs in the
 same order as the Leader's `AggregationJobContinueReq`. Otherwise, the Leader
 MUST abort the aggregation job.
-
-[[OPEN ISSUE: consider relaxing this ordering constraint. See issue#217.]]
 
 Otherwise, the Leader proceeds as follows with each report:
 
@@ -1812,19 +1816,19 @@ Next, the Helper checks if the continuation step indicated by the request is
 correct. (For the first `AggregationJobContinueReq` the value should be `1`;
 for the second the value should be `2`; and so on.) If the Leader is one step
 behind (e.g., the Leader has resent the previous HTTP request), then the Helper
-MAY attempt to recover by sending HTTP 202 status Accepted and discontinuing
-any further work. In this case it SHOULD verify that the contents of the
-`AggregationJobContinueReq` are identical to the previous message (see
-{{aggregation-step-skew-recovery}}). Otherwise, if the step is incorrect, the
-Helper MUST abort with error `stepMismatch`.
+MAY attempt to recover by sending HTTP 202 status Accepted without performing
+any additional work on the aggregation job. In this case it SHOULD verify that
+the contents of the `AggregationJobContinueReq` are identical to the previous
+message (see {{aggregation-step-skew-recovery}}). Otherwise, if the step is
+incorrect, the Helper MUST abort with error `stepMismatch`.
 
 If the Helper finds the `AggregationJobContinueReq` to be valid, it immediately
 responds with HTTP status 202 Accepted. The Helper is now ready to continue
-preparation for each report, asynchronously from any further requests from the
-Leader.
+preparation for the aggregation job, asynchronously from any further requests
+from the Leader.
 
-Let `inbound` denote the payload of the prep step. The Helper computes the
-following:
+Let `inbound` denote the payload of the prep step. For each report, the Helper
+computes the following:
 
 ~~~
 (state, outbound) = Vdaf.ping_pong_helper_continued(agg_param,
@@ -1865,8 +1869,15 @@ After receiving the response to its `AggregationJobContinueReq`, the Leader
 makes requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` to check on
 the status of the aggregation job. If the continuation is not finished yet,
-the Helper responds with HTTP status 202 Accepted. The Helper's response MAY
-include a Retry-After header field to suggest a polling interval to the Leader.
+the Helper MAY wait for the job to complete. Once the continuation is ready, or
+if it is already ready, the Helper responds with HTTP status 200 OK and a body
+consisting of an `AggregationJobResp`, with media type
+"application/dap-aggregation-job-resp".
+
+If the continuation is not finished yet, and the Helper chooses not to wait for
+the job to finish, the Helper responds with HTTP status 202 Accepted. The
+Helper's response SHOULD include a Retry-After header field to suggest a
+polling interval to the Leader.
 
 If the aggregation job is ready, the Helper constructs an `AggregationJobResp`
 message ({{aggregation-helper-init}}) with each prep step. The order of the
@@ -1990,23 +2001,24 @@ CollectionReq message, and the batch will have to be re-validated later on
 regardless.
 
 If the Leader finds the CollectionReq to be valid, it immediately responds with
-HTTP status 201.
+HTTP status 201 Created.
 
 The Leader then begins working with the Helper to aggregate the reports
 satisfying the query (or continues this process, depending on the VDAF) as
 described in {{aggregate-flow}}.
 
 Changing a collection job's parameters is illegal, so further requests to
-`PUT /tasks/{tasks}/collection_jobs/{collection-job-id}` for the same
+`PUT /tasks/{task-id}/collection_jobs/{collection-job-id}` for the same
 `collection-job-id` but with a different `CollectionReq` in the body MUST fail
 with an HTTP client error status code.
 
 After receiving the response to its `CollectionReq`, the Collector makes a
-request `GET /tasks/{tasks}/collection_jobs/{collection-job-id}` to check on
+request `GET /tasks/{task-id}/collection_jobs/{collection-job-id}` to check on
 the status of the collect job and eventually obtain the result. If the
-collection job is not finished yet, the Leader responds with HTTP status 202
-Accepted. The response MAY include a Retry-After header field to suggest a
-polling interval to the Collector.
+collection job is not finished yet, the Leader MAY wait for the collection job
+to finish. Otherwise, the Leader responds with HTTP status 202 Accepted. The
+response SHOULD include a Retry-After header field to suggest a polling interval
+to the Collector.
 
 Asynchronously from any request from the Collector, the Leader attempts to run
 the collection job. It first checks whether it can construct a batch for the
