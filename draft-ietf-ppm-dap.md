@@ -1567,10 +1567,10 @@ After receiving the response to its `AggregationJobInitReq`, the Leader makes
 requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` to check
 on the status of the aggregation job. If the aggregation job is not finished
-yet, the Helper MAY wait for the job to complete. Once the aggregation job is
-ready, or if it is already ready, the Helper responds with HTTP status 200 OK
-and a body consisting of an `AggregationJobResp`, with media type
-"application/dap-aggregation-job-resp".
+yet, the Helper MAY wait to respond until the job is complete. Once the
+aggregation job is ready, or if it is already ready, the Helper responds with
+HTTP status 200 OK and a body consisting of an `AggregationJobResp`, with media
+type "application/dap-aggregation-job-resp".
 
 If the aggregation job is not finished yet, and the Helper chooses not to wait
 for the job to finish, the Helper responds with HTTP status 202 Accepted. The
@@ -1869,9 +1869,9 @@ After receiving the response to its `AggregationJobContinueReq`, the Leader
 makes requests to
 `GET {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` to check on
 the status of the aggregation job. If the continuation is not finished yet,
-the Helper MAY wait for the job to complete. Once the continuation is ready, or
-if it is already ready, the Helper responds with HTTP status 200 OK and a body
-consisting of an `AggregationJobResp`, with media type
+the Helper MAY wait to respond until continuation is complete. Once the
+continuation is ready, or if it is already ready, the Helper responds with HTTP
+status 200 OK and a body consisting of an `AggregationJobResp`, with media type
 "application/dap-aggregation-job-resp".
 
 If the continuation is not finished yet, and the Helper chooses not to wait for
@@ -2015,10 +2015,10 @@ with an HTTP client error status code.
 After receiving the response to its `CollectionReq`, the Collector makes a
 request `GET /tasks/{task-id}/collection_jobs/{collection-job-id}` to check on
 the status of the collect job and eventually obtain the result. If the
-collection job is not finished yet, the Leader MAY wait for the collection job
-to finish. Otherwise, the Leader responds with HTTP status 202 Accepted. The
-response SHOULD include a Retry-After header field to suggest a polling interval
-to the Collector.
+collection job is not finished yet, the Leader MAY wait to respond until the
+job is complete. Otherwise, the Leader responds with HTTP status 202 Accepted.
+The response SHOULD include a Retry-After header field to suggest a polling
+interval to the Collector.
 
 Asynchronously from any request from the Collector, the Leader attempts to run
 the collection job. It first checks whether it can construct a batch for the
