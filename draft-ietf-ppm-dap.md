@@ -1892,6 +1892,13 @@ prepare for the next continuation step ({{aggregation-helper-continuation}}).
 Otherwise, if `state == Finished(out_share)`, then the Helper stores `out_share`
 for use in the collection interaction ({{collect-flow}}).
 
+If the VDAF in use has many steps, the Helper MAY discard stored state for the
+previous steps. It needs to only retain enough information to support the Leader
+transitioning from step `n` to `n+1`, so state for `n-1`, `n-2`, and and so on
+may be deleted. If discarding information, `GET` or `PUT` to requests
+`{helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}?step={step}`
+for outdated steps MUST fail with an HTTP status code.
+
 If for whatever reason the Leader must abandon the aggregation job, it SHOULD
 send a request to
 `DELETE {helper}/tasks/{task-id}/aggregation_jobs/{aggregation-job-id}` so that
